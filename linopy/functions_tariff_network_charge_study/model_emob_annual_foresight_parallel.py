@@ -69,14 +69,16 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
     
     # =========== VARIABLES ===============
     
-    OBJ_WITHOUT_PENALTIES = m.add_variables(name='OBJ_WITHOUT_PENALTIES')
+    #OBJ_WITHOUT_PENALTIES = m.add_variables(name='OBJ_WITHOUT_PENALTIES')
     C_OP = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name='C_OP')
+
+    C_OP_NO_PENALTY = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name="C_OP_NO_PENALTY")
 
     # EV Battery
     SOC_EV = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='SOC_EV', lower=0) # EV battery state of charge
     P_EV = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='P_EV', lower=0) # EV charge power
     P_BUY = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_BUY', lower=0) # EV Mobility
-    if parameters["settings_setup"] == "prosumage":
+    if parameters_opti["settings_setup"] == "prosumage":
         #BIN_IN = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='BIN_IN', binary=True) # EV Mobility
         P_IN = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_IN', lower=0) # EV Mobility
         P_OUT = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_OUT', lower=0) # EV Mobility
@@ -113,13 +115,13 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
 
 
-    if parameters["settings_setup"] == "prosumage":
+    if parameters_opti["settings_setup"] == "prosumage":
          cons_bess_update = m.add_constraints(SOC_BESS.isel(t=range(1,len(set_time))) == SOC_BESS.isel(t=range(0,len(set_time)-1)) + timesteplength * (parameters["stor_eta_in"]*P_IN.isel(t=range(0,len(set_time)-1)) - 1/parameters["stor_eta_out"]*P_OUT.isel(t=range(0,len(set_time)-1))) - parameters["stor_losses"], name='cons_stor_update')
          cons_bess_update_last_fix_in = m.add_constraints(P_IN.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_in')
          cons_bess_update_last_fix_out = m.add_constraints(P_OUT.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_out')
  
-         cons_bess_max_p_in = m.add_constraints(P_IN <= parameters["stor_p_ev"], name='cons_p_max_in')
-         cons_bess_max_p_out = m.add_constraints(P_OUT <= parameters["stor_p_ev"], name='cons_p_max_out')
+         cons_bess_max_p_in = m.add_constraints(P_IN <= parameters["stor_p_max"], name='cons_p_max_in')
+         cons_bess_max_p_out = m.add_constraints(P_OUT <= parameters["stor_p_max"], name='cons_p_max_out')
          #cons_bess_max_p_bin_in = m.add_constraints(P_IN <= BIN_IN * parameters["stor_p_ev"], name='cons_p_max_in')
          #cons_bess_max_p_bin_out = m.add_constraints(P_OUT <= (-BIN_IN+1) * parameters["stor_p_ev"], name='cons_p_max_out')
          cons_bess_max_soc = m.add_constraints(SOC_BESS <= parameters["stor_soc_max"], name='cons_stor_max_soc')
@@ -131,7 +133,7 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
 
     # Home Balance
-    if parameters["settings_setup"] == "prosumage":
+    if parameters_opti["settings_setup"] == "prosumage":
         cons_balance = m.add_constraints(P_BUY + P_PV + P_OUT - P_IN == P_EV + P_EV_NOT_HOME, name='cons_balance')
     else:
         cons_balance = m.add_constraints(P_BUY == P_EV + P_EV_NOT_HOME, name='cons_balance')
@@ -143,24 +145,25 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
     
     
     # PENALTY
-    cons_violation_charge_only_home  = m.add_constraints(P_EV_NOT_HOME <= (1-emob_home_xr) * parameters["ev_p_ev"], name='cons_violation_charge_only_home')
+    cons_violation_charge_only_home  = m.add_constraints(P_EV_NOT_HOME <= (1-emob_home_xr) * parameters["ev_p_charge_not_home"], name='cons_violation_charge_only_home')
     cons_violation_charge_only_home_last_fix = m.add_constraints(P_EV_NOT_HOME.isel(t=len(set_time)-1) == 0, name="cons_violation_charge_only_home_last_fix")
 
     cost_xr = np.maximum(network_charges_xr + spot_prices_xr,0)
-    cons_cost = m.add_constraints(C_OP == (cost_xr * P_BUY).sum(dims="t"), name="cons_cost")
+    cons_cost = m.add_constraints(C_OP ==(cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t") , name="cons_cost")
 
           
     #labels = m.compute_infeasibilities()
     #m.print_infeasibilities()  
     
     # zu minimierende Zielfunktion
-    if parameters["settings_obj_fnct"] == "immediate_charging" or parameters["settings_obj_fnct"] == "scheduled_charging":
-        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 995*SOC_MISSING.sum() 
-        cons_obj = m.add_constraints(OBJ_WITHOUT_PENALTIES == 999 * SOC_BELOW_PREF.sum())
-    elif parameters["settings_obj_fnct"] == "smart_charging":
-        
-        obj = (cost_xr * P_BUY).sum() + 999*P_EV_NOT_HOME.sum()   +  995*SOC_MISSING.sum() 
-        cons_obj =  m.add_constraints(OBJ_WITHOUT_PENALTIES == 999 * SOC_BELOW_PREF.sum())
+    if parameters_opti["settings_obj_fnct"] == "immediate_charging" or parameters_opti["settings_obj_fnct"] == "scheduled_charging":
+        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 999*SOC_MISSING.sum() 
+        cons_obj = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
+        #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
+    
+    elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
+        obj = (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum() +  999*SOC_MISSING.sum() 
+        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t"))
 
     m.add_objective(obj)
     
@@ -171,9 +174,7 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
 
 
-
-
-   
+    
     #cons_hp_min = m.add_constraints(P_HP - P_HP_slack >= 0, name='power_hp_min')
     #cons_hp_max = m.add_constraints(P_HP - P_HP_slack <= p_hp, name='power_hp_max')
     #cons_stor_max = m.add_constraints(E_HStor <= e_max, name='max_soc')
