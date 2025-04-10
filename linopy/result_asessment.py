@@ -28,6 +28,38 @@ result_SOC_EV = xr.open_dataarray(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU
 
 # ===== plotting ====
 
+
+if (True):
+    
+    result_C_OP_NO_PENALTY_eur.mean(dim="r")
+    
+    species = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
+    penguin_means = {'red': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim="v"),
+                    'reg': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim="v") }
+    
+    fig, ax = plt.subplots(layout='constrained')
+    
+    x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations
+    width = 0.25  # the width of the bars
+    multiplier = 0
+
+    
+    for attribute, measurement in penguin_means.items():
+        offset = width * multiplier
+        rects = ax.bar(x + offset, measurement, width, label=attribute)
+        #ax.bar_label(rects, padding=3)
+        multiplier += 1
+
+    # Add some text for labels, title and custom x-axis tick labels, etc.
+    ax.set_ylabel('Euro')
+    ax.set_title('Cost without penalties')
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(species, rotation=90)
+    ax.legend(loc='upper left', ncols=3)
+    ax.set_ylim(0, 250)
+
+
+
 if (True): # EV SOC
     pd_res = result_SOC_EV.isel(v=1, s=1).to_pandas()
     plt.figure()
