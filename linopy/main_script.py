@@ -29,7 +29,7 @@ import functions_tariff_network_charge_study.model_emob_annual_foresight_paralle
 
 # read in data
 
-which_dsos = range(0,50)   # 0 for all, otherwise use range or indices of xlsx file
+which_dsos = range(0,100)   # 0 for all, otherwise use range or indices of xlsx file
 parameter_year = 2021
 result_folder = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + "\\"
 
@@ -78,8 +78,14 @@ if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(netw
     print("Error: timeseries do not have equal length")
 
 
-
-timesteplength = 0.25 # h
+parameters_opti = {
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_setup": "prosumage", # "only_EV", # "prosumage"
+    "quarter" : "Q1",
+    "dso_subset" : range(0,50),
+    "emob_subset" : range(0,20),
+    "tso_subset" : range(1,2),
+    }
 
 parameters_model = {
     "ev_p_ev":3.7, # kW
@@ -97,17 +103,9 @@ parameters_model = {
     "ev_p_charge_not_home": 11
     }
 
-parameters_opti = {
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
-    "settings_setup": "prosumage", # "only_EV", # "prosumage"
-    "quarter" : "Q1",
-    "dso_subset" : range(0,9),
-    "emob_subset" : range(0,6),
-    "tso_subset" : range(1,2),
-    }
 
 
-length_chunk = 3
+length_chunk = 10
 lst = parameters_opti["dso_subset"]
 division = len(lst) / length_chunk
 chunks = [lst[round(length_chunk * i):round(length_chunk * (i + 1))] for i in range(int(np.ceil(division)))]
@@ -126,7 +124,7 @@ for chunk_dso in chunks:
     # create and run model
     m = model_emob_annual_forsight_smart.model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters_model, parameters_opti)
 
-    m_status = m.solve('gurobi', OutputFlag=0, presolve=2, LogToConsole=0, Method=1, PreSparsify=2)
+    m_status = m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
 
 
     # ==== DISPLAY if infeasibility variables are positive =====
@@ -149,6 +147,8 @@ for chunk_dso in chunks:
         result_C_OP_NO_PENALTY = m["C_OP_NO_PENALTY"].solution
         result_SOC_EV = m["SOC_EV"].solution
         result_P_BUY =  m["P_BUY"].solution
+        result_P_EV_NOT_HOME = m["P_EV_NOT_HOME"].solution
+        result_SOC_MISSING = m["SOC_MISSING"].solution
         
         if parameters_opti["settings_setup"] == "prosumage":
             result_P_PV = m["P_PV"].solution
@@ -157,12 +157,15 @@ for chunk_dso in chunks:
     else:
         result_C_OP = xr.concat([result_C_OP, m["C_OP"].solution], dim="r")
         result_C_OP_NO_PENALTY = xr.concat([result_C_OP, m["C_OP_NO_PENALTY"].solution], dim="r")
-        result_SOC_EV = xr.concat([result_SOC_EV, m["SOC_EV"].solution], "r")
-        result_P_BUY = xr.concat([result_P_BUY, m["P_BUY"].solution], "r")
+        result_SOC_EV = xr.concat([result_SOC_EV, m["SOC_EV"].solution], dim="r")
+        result_P_BUY = xr.concat([result_P_BUY, m["P_BUY"].solution], dim="r")
+        result_P_EV_NOT_HOME = xr.concat([result_P_EV_NOT_HOME, m["P_EV_NOT_HOME"].solution], dim="r")
+        result_SOC_MISSING = xr.concat([result_SOC_MISSING, m["SOC_MISSING"].solution], dim="r")
+
         
         if parameters_opti["settings_setup"] == "prosumage":
-            result_P_PV = xr.concat([result_P_PV, m["P_PV"].solution], "r")
-            result_SOC_BESS = xr.concat([result_SOC_BESS, m["SOC_BESS"].solution], "r")
+            result_P_PV = xr.concat([result_P_PV, m["P_PV"].solution], dim="r")
+            result_SOC_BESS = xr.concat([result_SOC_BESS, m["SOC_BESS"].solution], dim="r")
 
     # delete model of this chunk to save memory
     # del m
@@ -178,8 +181,8 @@ result_C_OP_NO_PENALTY_eur = result_C_OP_NO_PENALTY/100 # ct --> eur
 idx_time = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
 result_P_BUY["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
 result_SOC_EV["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
-
-
+result_P_EV_NOT_HOME["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"] 
+result_SOC_MISSING["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]  
 
 warnings.simplefilter(action='default', category=FutureWarning)      
 
@@ -195,5 +198,14 @@ result_C_OP.to_netcdf(folder_path / "C_OP.nc")
 result_C_OP_NO_PENALTY_eur.to_netcdf(folder_path / "C_OP_NO_PENALTY.nc")
 result_SOC_EV.to_netcdf(folder_path / "SOC_EV.nc")
 result_P_BUY.to_netcdf(folder_path / "P_BUY.nc")
+result_P_EV_NOT_HOME.to_netcdf(folder_path / "P_EV_NOT_HOME.nc")
+result_SOC_MISSING.to_netcdf(folder_path / "SOC_MISSING.nc")
 
+with open(folder_path / "parameters_opti.txt", 'w') as f:
+    f.write(pd.DataFrame.from_dict(parameters_opti, orient='index').to_string(header=False, index=True))
+    
+with open(folder_path / "parameters_model.txt", 'w') as f:
+    f.write(pd.DataFrame.from_dict(parameters_model, orient='index').to_string(header=False, index=True))
+    
+print("Saved data sucessfully to: " + str(folder_path))
 

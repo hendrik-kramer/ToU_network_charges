@@ -36,6 +36,7 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     irradiance_xr = irradiance_xr.isel(t=time_subset, a=tso_subset)
 
     emob_home_xr = (emob_state_xr=="home")
+    emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean()).drop_vars("s")
 
     dso_names = network_charges_xr.r.to_numpy()
 
@@ -128,14 +129,15 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
 
          cons_pv_p_max = m.add_constraints(P_PV <= (irradiance_xr * parameters["pv_p_max"]), name='cons_pv_p_max')
 
-         
+    if parameters_opti["settings_obj_fnct"] == "scheduled_charging":
+        cons_no_HT_charge = m.add_constraints(P_BUY <= emob_HT_xr * 999)      
 
 
     # Home Balance
     if parameters_opti["settings_setup"] == "prosumage":
-        cons_balance = m.add_constraints(P_BUY + P_PV + P_OUT - P_IN == P_EV + P_EV_NOT_HOME, name='cons_balance')
+        cons_balance = m.add_constraints(P_BUY + P_EV_NOT_HOME - P_PV + P_OUT - P_IN == P_EV, name='cons_balance')
     else:
-        cons_balance = m.add_constraints(P_BUY == P_EV + P_EV_NOT_HOME, name='cons_balance')
+        cons_balance = m.add_constraints(P_BUY + P_EV_NOT_HOME == P_EV, name='cons_balance')
 
 
 
@@ -156,13 +158,18 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     
     # zu minimierende Zielfunktion
     if parameters_opti["settings_obj_fnct"] == "immediate_charging" or parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 999*SOC_MISSING.sum() 
-        cons_obj = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
+        obj = 9999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 999*SOC_MISSING.sum() 
+        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t"))
         #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
     
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
         obj = (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum() +  999*SOC_MISSING.sum() 
         cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t"))
+        
+    #elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":    
+    #    obj = (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum() +  999*SOC_MISSING.sum() 
+    #    cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t"))
+
 
     m.add_objective(obj)
     

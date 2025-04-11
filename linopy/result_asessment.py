@@ -19,13 +19,16 @@ from pathlib import Path
 
 
 # read  results
-folder_name = "2025-11-11_08-50_Q1_smart_charging_prosumage"
+folder_name = "2025-11-11_15-04_Q1_smart_charging_prosumage"
+
+
 folder_path = Path("../daten_results") / folder_name
 
 result_C_OP_NO_PENALTY_eur = xr.open_dataarray(folder_path / "C_OP_NO_PENALTY.nc")
 result_SOC_EV = xr.open_dataarray(folder_path / "SOC_EV.nc")
 result_P_BUY = xr.open_dataarray(folder_path / "P_BUY.nc")
-
+result_P_EV_NOT_HOME = xr.open_dataarray(folder_path / "P_EV_NOT_HOME.nc")
+result_SOC_MISSING = xr.open_dataarray(folder_path / "SOC_MISSING.nc")
 
 # reconvert seconds to datetime
 epoch_time = datetime(1970, 1, 1)
@@ -33,41 +36,113 @@ dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_SOC_EV["t"], unit='s'
 
 result_SOC_EV["t"] = dti
 result_P_BUY["t"] = dti
-
+result_P_EV_NOT_HOME["t"] = dti
+result_SOC_MISSING["t"] = dti
 
 
 # ===== plotting ====
 
 
-if (True):
-    
-    result_C_OP_NO_PENALTY_eur.mean(dim="r")
-    
-    species = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
-    penguin_means = {'red': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim="v"),
-                    'reg': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim="v") }
-    
-    fig, ax = plt.subplots(layout='constrained')
+if (False):  # COST
+      
+    scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
+    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim="v"),
+                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim="v") }
     
     x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations
     width = 0.25  # the width of the bars
-    multiplier = 0
+    colors_plot = ["#D04119", "#004c93"]
+    hatch_plot = ["","//"]
+    ct = 0
+    
+    fig, ax = plt.subplots(layout='constrained')
+
+    for attribute, measurement in dso_means.items():
+        offset = width * ct
+        rects = ax.bar(x + offset, measurement, width, label=attribute, color=colors_plot[ct], hatch=hatch_plot[ct])
+        #ax.bar_label(rects, padding=3)
+        ct += 1
+
+    ax.set_ylabel('Procurement and Network Cost in Euro')
+    str_v = str(len(result_C_OP_NO_PENALTY_eur["v"]))
+    ax.set_title('Charging at home, averaging over ' + str_v + ' different mobility use cases')
+    ax.set_xticks(x + width)
+    ax.set_xticklabels(scenarios, rotation=90)
+    ax.legend(loc='upper left', ncols=1)
+    ax.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
+    ax.set_axisbelow(True)
+
+    fig.savefig(folder_path / "dso_cost_barlot.svg")
+
+
+
+if (False): # CHARGE POWER 
+
+
+    def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H="/", **kwargs):
+        """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
+    labels is a list of the names of the dataframe, used for the legend
+    title is a string for the title of the plot
+    H is the hatch used for identification of the different dataframe"""
+        import matplotlib as mpl
+        from cycler import cycler
+        mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#666666", "#bbbbbb"])
+    
+        n_df = len(dfall)
+        n_col = len(dfall[0].columns) 
+        n_ind = len(dfall[0].index)
+        axe = plt.subplot(111)
+        plt.subplots_adjust(bottom=0.476,left=0.057,right=0.917,top=0.9)
+        
+        for df in dfall : # for each data frame
+            axe = df.plot(kind="bar",
+                          linewidth=0,
+                          stacked=True,
+                          ax=axe,
+                          legend=False,
+                          grid=False,
+                          **kwargs)  # make bar plots
+    
+        h,l = axe.get_legend_handles_labels() # get the handles we want to modify
+        for i in range(0, n_df * n_col, n_col): # len(h) = n_col * n_df
+            for j, pa in enumerate(h[i:i+n_col]):
+                for rect in pa.patches: # for each index
+                    rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
+                    #rect.set_color(colors_plot[j,int(np.floor(i/n_df))])
+                    #print(int(i / n_col))
+                    rect.set_hatch(H * int(i / n_col)) #edited part     
+                    rect.set_width(1 / float(n_df + 1))
+                    #print(int(np.floor(i/n_df)),j)
+    
+        axe.set_xticks((np.arange(0, 2 * n_ind, 2) + 1 / float(n_df + 1)) / 2.)
+        axe.set_xticklabels(df.index, rotation = 90)
+        axe.set_title(title)
+    
+        # Add invisible data to add another legend
+        n=[]        
+        for i in range(n_df):
+            n.append(axe.bar(0, 0, color="#eeeeee", hatch=H * i))
+    
+        l1 = axe.legend(h[:n_col], l[:n_col], loc="upper left", ncol=2) #[1.01, 0.5]
+        if labels is not None:
+            l2 = plt.legend(n, labels,  loc="upper right", ncol=2) # loc=[1.01, 0.1],
+        axe.add_artist(l1)
+        
+        axe.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
+        axe.set_axisbelow(True)
+        axe.set_ylim([0, 1.3*max(df_reg.max().max(), df_red.max().max())])
+        #axe.subplots_adjust(bottom=0.2)
+        return axe
 
     
-    for attribute, measurement in penguin_means.items():
-        offset = width * multiplier
-        rects = ax.bar(x + offset, measurement, width, label=attribute)
-        #ax.bar_label(rects, padding=3)
-        multiplier += 1
+    df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum(dim=["t","v"])/4, "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum(dim=["t","v"])/4}, index=result_P_BUY["r"] )
+    df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum(dim=["t","v"])/4, "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum(dim=["t","v"])/4}, index=result_P_BUY["r"] )
 
-    # Add some text for labels, title and custom x-axis tick labels, etc.
-    ax.set_ylabel('Euro')
-    ax.set_title('Cost without penalties')
-    ax.set_xticks(x + width)
-    ax.set_xticklabels(species, rotation=90)
-    ax.legend(loc='upper left', ncols=3)
-    ax.set_ylim(0, 250)
+    plot_clustered_stacked([df_reg, df_red],["regular network charges", "reduced network charges"], title="Energy consumed in kWh")
 
+    fig.savefig(folder_path / "dso_energy_barlot.svg")
+    
+    
 
 
 if (True): # EV SOC
@@ -102,7 +177,7 @@ if (False): # P_BUY
     plt.show()
 
 
-if (False): # P_BUY
+if (False):
     # quantile plot of EV over all regions
     fig1, ax1 = plt.subplots()
     for quantile in [0.0, 0.1, 0.2, 0.3, 0.4]:

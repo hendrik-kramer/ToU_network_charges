@@ -180,6 +180,7 @@ def load_network_charges(input_filepath, which_dsos, timesteps):
     
     
     # repeat to get the full year's network charge timeseries
+    timesteps = timesteps.drop("seconds_since_1970_in_utc", axis=1)
     network_charges_red_year = pd.merge(timesteps, network_charges_red, how="left", on=("TimeString", "Quarter")).set_index("DateTime", drop=True).drop(columns=["TimeString", "Quarter"])
     network_charges_reg_year = pd.merge(timesteps, network_charges_reg, how="left", on=("TimeString", "Quarter")).set_index("DateTime", drop=True).drop(columns=["TimeString", "Quarter"])
     network_charges_red_year = network_charges_red_year.drop(columns="DateString")
