@@ -9,25 +9,23 @@ import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 
-def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters, parameters_opti):
+def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters, parameters_opti):
 
     
 
     quarter = parameters_opti["quarter"]
-    time_subset = timpesteps[timpesteps["Quarter"] == quarter].index #range(0,96*30)
+    time_subset = timesteps[timesteps["Quarter"] == quarter].index #range(0,96*30)
     dso_subset = parameters_opti["dso_subset"]
     emob_subset = parameters_opti["emob_subset"]
     tso_subset = parameters_opti["tso_subset"]
+       
     
-   
-    
-    
-    timpesteps = timpesteps.iloc[time_subset]
+    timesteps = timesteps.iloc[time_subset]
     spot_prices_xr = spot_prices_xr.isel(t=time_subset)
     network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
     emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
     emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
-    emob_departure_times = emob_departure_times[emob_subset]
+    emob_departure_times = emob_departure_times.iloc[emob_subset]
     
     for key in dict_idx_lookup:
         dict_idx_lookup[key] = dict_idx_lookup[key][dict_idx_lookup[key].isin(time_subset)]
@@ -41,7 +39,7 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
     dso_names = network_charges_xr.r.to_numpy()
 
-    timesteplength = (timpesteps.DateTime.iloc[1] - timpesteps.DateTime.iloc[0]).total_seconds()/3600
+    timesteplength = (timesteps.DateTime.iloc[1] - timesteps.DateTime.iloc[0]).total_seconds()/3600
 
 
     print(dt.now())
@@ -55,11 +53,14 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
         
 
 
-          
+    warnings.simplefilter(action='ignore', category=FutureWarning)  
+    warnings.simplefilter(action='ignore', category=UserWarning)      
+    
+    
     m = Model()
             
     # Definiere Sets
-    set_time = pd.Index(timpesteps["DateTime"], name="t")
+    set_time = pd.Index(timesteps["DateTime"], name="t")
     #print("set_time " , str(list(set_time)))
     set_dso = pd.Index(dso_names, name="r")
     set_region = pd.Index(irradiance_xr.a, name="a")
@@ -98,7 +99,7 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
             
     # =========== CONSTRAINTS ===============
-    
+
     # EV Battery
     cons_ev_update = m.add_constraints(SOC_EV.isel(t=range(1,len(set_time))) == SOC_EV.isel(t=range(0,len(set_time)-1)) + timesteplength * (P_EV.isel(t=range(0,len(set_time)-1)) + P_EV_NOT_HOME.isel(t=range(0,len(set_time)-1)) - emob_demand_xr.isel(t=range(0,len(set_time)-1))) , name='cons_ev_update')
     cons_ev_update_last_fix = m.add_constraints(P_EV.isel(t=len(set_time)-1) == 0, name='cons_ev_update_last_fix')
@@ -107,11 +108,9 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
     # dedicated filling level when person usually departs from home
     for ct_ev in emob_subset:
-        warnings.simplefilter(action='ignore', category=FutureWarning)
         con_ct_pref_ev = m.add_constraints( SOC_EV.isel(v=ct_ev, t=dict_idx_lookup[emob_departure_times[ct_ev]]) >= - SOC_MISSING.isel(v=ct_ev, t=dict_idx_lookup[emob_departure_times[ct_ev]]) + parameters["ev_soc_departure"] * parameters["ev_soc_max"], name='cons_ct_pref_ev_'+str(ct_ev))
-        warnings.simplefilter(action='default', category=FutureWarning)
-        del con_ct_pref_ev
-    
+        #del con_ct_pref_ev
+
 
 
 
@@ -167,6 +166,8 @@ def model_emob_annual_smart(timpesteps, spot_prices_xr, network_charges_xr, emob
 
     m.add_objective(obj)
     
+    warnings.simplefilter(action='default', category=FutureWarning)
+    warnings.simplefilter(action='default', category=UserWarning)      
 
     
     return m

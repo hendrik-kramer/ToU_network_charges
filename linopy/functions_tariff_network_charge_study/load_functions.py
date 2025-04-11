@@ -16,22 +16,26 @@ def load_timesteps(input_year):
     
     parameter_year = input_year
     # get relevant weeks to compute
-    str_start_check = pd.Series(pd.date_range(str(parameter_year-1) + "-12-25 00:00:00", periods=14, freq="d")) 
+    str_start_check = pd.Series(pd.date_range(str(parameter_year-1) + "-12-25 00:00:00", periods=14, freq="d")) #.astype('datetime64[s]') 
     timestep_start = str_start_check[str_start_check.dt.isocalendar().week == 1].iloc[0] - pd.Timedelta(hours=1) # minus 1 for UTC - 1
-    str_end_check = pd.Series(pd.date_range(str(parameter_year) + "-12-25 23:45:00", periods=14, freq="d"))
+    str_end_check = pd.Series(pd.date_range(str(parameter_year) + "-12-25 23:45:00", periods=14, freq="d")) #.astype('datetime64[s]')
     timestep_end = str_end_check[str_end_check.dt.isocalendar().week != 1].iloc[-1] - pd.Timedelta(hours=1)  # minus 1 for UTC - 1
     
     timesteps_string = pd.date_range(start=timestep_start, end=timestep_end, freq='15min').strftime('%Y-%m-%d %H:%M:%S')
     timesteps_df_col = pd.DataFrame({"DateTime":timesteps_string})
     timesteps_series = pd.Series(timesteps_string)
     timesteps = pd.DataFrame()
-    timesteps["DateTime"] = pd.to_datetime(timesteps_series, utc=True).dt.tz_convert('Europe/Berlin')
+    #timesteps["DateTime"] = pd.to_datetime(timesteps_series).astype('datetime64[s]').dt.tz_localize('UTC').dt.tz_convert('Europe/Berlin')
+    timesteps["DateTime"] = pd.to_datetime(timesteps_series).dt.tz_localize('UTC').dt.tz_convert('Europe/Berlin')
     timesteps["Quarter"] = "Q" + np.ceil(timesteps["DateTime"].dt.month/3).astype(int).astype(str)
     timesteps.loc[1:1000, "Quarter"] = "Q1" # overwrite if start is in last year
     timesteps.loc[len(timesteps)-1000:, "Quarter"] = "Q4" # overwrite if end is in new year    
     timesteps["TimeString"] = timesteps["DateTime"].dt.strftime('%H:%M:%S')
     timesteps["DateString"] = timesteps["DateTime"].dt.strftime('%Y-%m-%d')
     
+    epoch_time = datetime.datetime(1970, 1, 1)
+    timesteps_utc = timesteps["DateTime"].dt.tz_convert("UTC").dt.tz_convert(None)
+    timesteps["seconds_since_1970_in_utc"] = (timesteps_utc - epoch_time).dt.total_seconds() 
     
     return timesteps
 

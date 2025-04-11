@@ -13,16 +13,26 @@ import matplotlib.pyplot as plt
 from datetime import date, timedelta, datetime
 import numpy as np
 import xarray as xr
+from pathlib import Path
 
 
 
 
-# save results
-string_time = r"2025-10-10_18-24"
+# read  results
+folder_name = "2025-11-11_08-50_Q1_smart_charging_prosumage"
+folder_path = Path("../daten_results") / folder_name
 
-result_C_OP_NO_PENALTY_eur = xr.open_dataarray(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\C_OP_NO_PENALTY_"+string_time+".nc")
-result_SOC_EV = xr.open_dataarray(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\SOC_EV_"+string_time+".nc")
+result_C_OP_NO_PENALTY_eur = xr.open_dataarray(folder_path / "C_OP_NO_PENALTY.nc")
+result_SOC_EV = xr.open_dataarray(folder_path / "SOC_EV.nc")
+result_P_BUY = xr.open_dataarray(folder_path / "P_BUY.nc")
 
+
+# reconvert seconds to datetime
+epoch_time = datetime(1970, 1, 1)
+dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_SOC_EV["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+
+result_SOC_EV["t"] = dti
+result_P_BUY["t"] = dti
 
 
 

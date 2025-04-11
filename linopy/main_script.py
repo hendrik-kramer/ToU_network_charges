@@ -13,6 +13,10 @@ import matplotlib.pyplot as plt
 from datetime import date, timedelta, datetime
 import numpy as np
 import xarray as xr
+import warnings
+import os
+from pathlib import Path
+
 
 import functions_tariff_network_charge_study.load_functions as f_load
 #import functions_tariff_network_charge_study.model_perfect_foresight_parallel as model_perf_forsight
@@ -28,6 +32,10 @@ import functions_tariff_network_charge_study.model_emob_annual_foresight_paralle
 which_dsos = range(0,50)   # 0 for all, otherwise use range or indices of xlsx file
 parameter_year = 2021
 result_folder = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + "\\"
+
+
+warnings.simplefilter(action='ignore', category=UserWarning)      
+
 
 # get relevant timesteps to compute KW1-KW52/53
 timesteps = f_load.load_timesteps(parameter_year)
@@ -60,6 +68,9 @@ irradiance_xr = np.round(f_load.load_irradiance(parameter_file_hochrechung, para
 # temperature_xr = f_load.load_temperature(parameter_folderpath_temperature, timesteps)
 
 
+warnings.simplefilter(action='default', category=UserWarning)      
+
+
 
 
 # Sanity check
@@ -88,21 +99,21 @@ parameters_model = {
 
 parameters_opti = {
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
-    "settings_setup": "only_EV", # "only_EV", # "prosumage"
+    "settings_setup": "prosumage", # "only_EV", # "prosumage"
     "quarter" : "Q1",
-    "dso_subset" : range(0,20),
-    "emob_subset" : range(0,50),
+    "dso_subset" : range(0,9),
+    "emob_subset" : range(0,6),
     "tso_subset" : range(1,2),
     }
 
 
-length_chunk = 5
+length_chunk = 3
 lst = parameters_opti["dso_subset"]
 division = len(lst) / length_chunk
 chunks = [lst[round(length_chunk * i):round(length_chunk * (i + 1))] for i in range(int(np.ceil(division)))]
 
 
-♣
+
 for chunk_dso in chunks:
 
     print("   ")
@@ -154,7 +165,7 @@ for chunk_dso in chunks:
             result_SOC_BESS = xr.concat([result_SOC_BESS, m["SOC_BESS"].solution], "r")
 
     # delete model of this chunk to save memory
-    del m
+    # del m
 
 
 #  ==== END OF LOOP =====
@@ -163,13 +174,26 @@ for chunk_dso in chunks:
 result_C_OP_eur = result_C_OP/100 # ct --> eur
 result_C_OP_NO_PENALTY_eur = result_C_OP_NO_PENALTY/100 # ct --> eur
 
+# convert int64 of datetime object to seconds to be able to save netcdf
+idx_time = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
+result_P_BUY["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
+result_SOC_EV["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
+
+
+
+warnings.simplefilter(action='default', category=FutureWarning)      
+
 
 #  ==== SAVE RESULTS =====
 
+# create new folder for results
 str_now = datetime.now().strftime("%Y-%d-%d_%H-%M")
-result_C_OP.to_netcdf(result_folder + "C_OP" + "_" + str_now + ".nc")
-result_C_OP_NO_PENALTY_eur.to_netcdf(result_folder + "C_OP_NO_PENALTY" + "_" + str_now + ".nc")
-result_SOC_EV.to_netcdf(result_folder + "SOC_EV" + "_" + str_now + ".nc")
-result_P_BUY.to_netcdf(result_folder + "P_BUY" + "_" + str_now + ".nc")
+folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["quarter"] + "_" + parameters_opti["settings_obj_fnct"] + "_" + parameters_opti["settings_setup"])
+os.makedirs(folder_path, exist_ok=True)
+
+result_C_OP.to_netcdf(folder_path / "C_OP.nc")
+result_C_OP_NO_PENALTY_eur.to_netcdf(folder_path / "C_OP_NO_PENALTY.nc")
+result_SOC_EV.to_netcdf(folder_path / "SOC_EV.nc")
+result_P_BUY.to_netcdf(folder_path / "P_BUY.nc")
 
 
