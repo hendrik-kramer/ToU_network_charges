@@ -67,7 +67,7 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
     
         price_data = price_data.rename(columns={"DateTime":"t"}).set_index("t", drop=True)
         price_data = xr.DataArray(price_data["spot_cost"])
-        prices_xr = price_data
+        prices_xr = price_data.astype(float)
     
     else: # "id_auktion_15_uhr" 
         print("load 15h auction data")
@@ -109,10 +109,18 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
         price_data_series = price_data["spot_price"]
         
         price_data_xr = xr.DataArray(price_data_series)
-        prices_xr = price_data_xr
+        prices_xr = price_data_xr.astype(float)
     
     return prices_xr
 
+
+def get_tariff_prices(spot_prices_xr):
+    
+    tarrif_prices_xr = spot_prices_xr
+    tarrif_prices_xr = np.round(spot_prices_xr.mean().item(), decimals=3)
+        
+    return tarrif_prices_xr
+    
 
 
 def load_network_charges(input_filepath, which_dsos, timesteps):
@@ -191,7 +199,7 @@ def load_network_charges(input_filepath, which_dsos, timesteps):
     network_charges_xr = xr.concat([xr.DataArray(network_charges_red_year, dims=['t','r']).expand_dims("s",axis=2), xr.DataArray(network_charges_reg_year, dims=['t','r']).expand_dims("s",axis=2)], dim="s")
     network_charges_xr['s'] = ['red', 'reg']
     
-    return network_charges_xr
+    return network_charges_xr.astype(float)
 
 
 def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
@@ -199,6 +207,15 @@ def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
     emob_demand = pd.read_csv(input_filepath_emob_demand, encoding='utf-8')
     emob_demand["date"] = pd.to_datetime(emob_demand["date"])
     first_datetime_timestep = timesteps["DateTime"].iloc[0].strftime('%Y-%m-%d %H:%M:%S')
+
+    
+    if emob_demand.iloc[1000].date.year != int(first_datetime_timestep[0:4]):
+        offset = 365 * (int(first_datetime_timestep[0:4]) - emob_demand.iloc[1000].date.year)
+        print("================================================================")
+        print("!!! Emob timesteps do not match. Shift emob dates by days: " + str(offset) + ", i.e. weeksdays and daylight saving not correct !!!")
+        emob_demand.date = emob_demand.date + pd.Timedelta(offset, unit="D")
+
+    
     idx_first_datetime = emob_demand[emob_demand["date"].dt.strftime('%Y-%m-%d %H:%M:%S') == first_datetime_timestep].index[0]
     emob_year = emob_demand.loc[idx_first_datetime:idx_first_datetime+len(timesteps)-1]
     emob_year = emob_year.rename(columns={"date":"t"}).set_index("t", drop=True)
@@ -209,6 +226,14 @@ def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
     emob_demand = pd.read_csv(input_filepath_emob_state, encoding='utf-8')
     emob_demand["date"] = pd.to_datetime(emob_demand["date"])
     first_datetime_timestep = timesteps["DateTime"].iloc[0].strftime('%Y-%m-%d %H:%M:%S')
+
+    
+    if emob_demand.iloc[1000].date.year != int(first_datetime_timestep[0:4]):
+        offset = 365 * (int(first_datetime_timestep[0:4]) - emob_demand.iloc[1000].date.year)
+        print("!!! Emob timesteps do not match. Shift emob dates by days: " + str(offset) + ", i.e. weeksdays and Daylight Saving not correct !!!")
+        print("================================================================")
+        emob_demand.date = emob_demand.date + pd.Timedelta(offset, unit="D")
+    
     idx_first_datetime = emob_demand[emob_demand["date"].dt.strftime('%Y-%m-%d %H:%M:%S') == first_datetime_timestep].index[0]
     emob_year = emob_demand.loc[idx_first_datetime:idx_first_datetime+len(timesteps)-1]
     emob_year = emob_year.rename(columns={"date":"t"}).set_index("t", drop=True)
@@ -219,7 +244,7 @@ def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
     return emob_demand_xr, emob_state_xr
 
 
-def deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps):
+def deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, shift_timesteps_int):
 
     amt_timesteps = len(timesteps)
     
@@ -263,7 +288,7 @@ def deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps):
     dict_id_timesteps = {}
     
     for ct_ts in  unique_timesteps:
-        dict_id_timesteps[ct_ts] = timesteps.index[ct_ts == timesteps["DateTime"].dt.time]
+        dict_id_timesteps[ct_ts] = timesteps.index[ct_ts == timesteps["DateTime"].dt.time] + shift_timesteps_int
 
 
     return times_arrival, times_departure, dict_id_timesteps

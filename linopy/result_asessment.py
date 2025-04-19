@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 # read  results
-folder_name = "2025-11-11_15-04_Q1_smart_charging_prosumage"
+folder_name = "2025-18-18_12-44_Q1_smart_charging_prosumage"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -46,8 +46,8 @@ result_SOC_MISSING["t"] = dti
 if (False):  # COST
       
     scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
-    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim="v"),
-                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim="v") }
+    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v","t"]),
+                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim=["v","t"]) }
     
     x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations
     width = 0.25  # the width of the bars
@@ -146,7 +146,7 @@ if (False): # CHARGE POWER
 
 
 if (True): # EV SOC
-    pd_res = result_SOC_EV.isel(v=1, s=1).to_pandas()
+    pd_res = result_SOC_EV.isel(v=1, r=1).to_pandas()
     plt.figure()
     plt.plot(pd_res)
     plt.legend(pd_res.columns)
@@ -164,7 +164,7 @@ if (True) and parameters_model["settings_setup"] == "prosumage": # P_PV
     
 if (True) and parameters_model["settings_setup"] == "prosumage": # BESS SOC
     plt.figure()
-    plt.plot(result_SOC_BESS)
+    plt.plot(result_SOC_BESS.isel(v=1,r=1))
     plt.legend(result_SOC_BESS.columns)
     plt.ylabel("SOC BESS in kWh")
     plt.show()

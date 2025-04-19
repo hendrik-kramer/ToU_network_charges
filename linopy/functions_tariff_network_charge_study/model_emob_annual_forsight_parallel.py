@@ -1,5 +1,3 @@
-
-
 import os
 import sys
 import warnings
@@ -9,7 +7,7 @@ import numpy as np
 import pandas as pd
 from datetime import datetime as dt
 
-def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters, parameters_opti):
+def model_emob_annual_smart(timesteps, spot_prices_xr, tariff_price, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters, parameters_opti):
 
     
 
@@ -22,6 +20,7 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     
     timesteps = timesteps.iloc[time_subset]
     spot_prices_xr = spot_prices_xr.isel(t=time_subset)
+    tariff_prices_xr = tariff_prices_xr.isel(t=time_subset)
     network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
     emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
     emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
@@ -47,9 +46,10 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
 
 
     # calucalte arrival SOC --> TO BE UPDATED
-    e_init_percent = 0.9
     e_max = parameters["ev_soc_max"]
     soc_preference = parameters["ev_soc_preference"]
+    e_ev_init_percent = parameters["ev_soc_init"]
+    e_bess_init_percent = parameters["bess_soc_init"]
 
         
 
@@ -106,6 +106,9 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     cons_ev_update_last_fix = m.add_constraints(P_EV.isel(t=len(set_time)-1) == 0, name='cons_ev_update_last_fix')
     cons_ev_max_soc = m.add_constraints(SOC_EV <= parameters["ev_soc_max"], name='cons_ev_max_soc')
     cons_ev_charge_only_home = m.add_constraints(P_EV <= emob_home_xr * parameters["ev_p_ev"], name='cons_ev_charge_only_home')
+    #cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == e_ev_init_percent * parameters["ev_soc_max"], name='cons_ev_init')
+
+
 
     # dedicated filling level when person usually departs from home
     for ct_ev in emob_subset:
@@ -116,16 +119,18 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
 
 
     if parameters_opti["settings_setup"] == "prosumage":
-         cons_bess_update = m.add_constraints(SOC_BESS.isel(t=range(1,len(set_time))) == SOC_BESS.isel(t=range(0,len(set_time)-1)) + timesteplength * (parameters["stor_eta_in"]*P_IN.isel(t=range(0,len(set_time)-1)) - 1/parameters["stor_eta_out"]*P_OUT.isel(t=range(0,len(set_time)-1))) - parameters["stor_losses"], name='cons_stor_update')
+         cons_bess_update = m.add_constraints(SOC_BESS.isel(t=range(1,len(set_time))) == SOC_BESS.isel(t=range(0,len(set_time)-1)) + timesteplength * (parameters["bess_eta_in"]*P_IN.isel(t=range(0,len(set_time)-1)) - 1/parameters["bess_eta_out"]*P_OUT.isel(t=range(0,len(set_time)-1))) - parameters["stor_losses"], name='cons_bess_update')
          cons_bess_update_last_fix_in = m.add_constraints(P_IN.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_in')
          cons_bess_update_last_fix_out = m.add_constraints(P_OUT.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_out')
  
-         cons_bess_max_p_in = m.add_constraints(P_IN <= parameters["stor_p_max"], name='cons_p_max_in')
-         cons_bess_max_p_out = m.add_constraints(P_OUT <= parameters["stor_p_max"], name='cons_p_max_out')
-         #cons_bess_max_p_bin_in = m.add_constraints(P_IN <= BIN_IN * parameters["stor_p_ev"], name='cons_p_max_in')
-         #cons_bess_max_p_bin_out = m.add_constraints(P_OUT <= (-BIN_IN+1) * parameters["stor_p_ev"], name='cons_p_max_out')
-         cons_bess_max_soc = m.add_constraints(SOC_BESS <= parameters["stor_soc_max"], name='cons_stor_max_soc')
+         cons_bess_max_p_in = m.add_constraints(P_IN <= parameters["bess_p_max"], name='cons_p_max_in')
+         cons_bess_max_p_out = m.add_constraints(P_OUT <= parameters["bess_p_max"], name='cons_p_max_out')
+         #cons_bess_max_p_bin_in = m.add_constraints(P_IN <= BIN_IN * parameters["bess_p_ev"], name='cons_p_max_in')
+         #cons_bess_max_p_bin_out = m.add_constraints(P_OUT <= (-BIN_IN+1) * parameters["bess_p_ev"], name='cons_p_max_out')
+         cons_bess_max_soc = m.add_constraints(SOC_BESS <= parameters["bess_soc_max"], name='cons_bess_max_soc')
          cons_bess_circle = m.add_constraints(SOC_BESS.isel(t=1) == SOC_BESS.isel(t=len(set_time)-1))
+         cons_bess_init = m.add_constraints(SOC_BESS.isel(t=0) == e_bess_init_percent * parameters["bess_soc_max"], name='cons_bess_init')
+
 
          cons_pv_p_max = m.add_constraints(P_PV <= (irradiance_xr * parameters["pv_p_max"]), name='cons_pv_p_max')
 
@@ -149,9 +154,14 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     cons_violation_charge_only_home  = m.add_constraints(P_EV_NOT_HOME <= (1-emob_home_xr) * parameters["ev_p_charge_not_home"], name='cons_violation_charge_only_home')
     cons_violation_charge_only_home_last_fix = m.add_constraints(P_EV_NOT_HOME.isel(t=len(set_time)-1) == 0, name="cons_violation_charge_only_home_last_fix")
 
-    cost_xr = np.maximum(network_charges_xr + spot_prices_xr,0)
-    cons_cost = m.add_constraints(C_OP ==(cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t") , name="cons_cost")
+    if parameters_opti["prices"] == "spot":
+        cost_xr = np.maximum(network_charges_xr + spot_prices_xr,0)
+    elif parameters_opti["prices"] == "mean":
+        cost_xr = np.maximum(network_charges_xr + tariff_price,0)
 
+    
+    cons_cost = m.add_constraints(C_OP ==(cost_xr * (P_BUY + 2*P_EV_NOT_HOME)).sum(dims="t") , name="cons_cost")
+    
           
     #labels = m.compute_infeasibilities()
     #m.print_infeasibilities()  
@@ -185,7 +195,7 @@ def model_emob_annual_smart(timesteps, spot_prices_xr, network_charges_xr, emob_
     
     #cons_hp_min = m.add_constraints(P_HP - P_HP_slack >= 0, name='power_hp_min')
     #cons_hp_max = m.add_constraints(P_HP - P_HP_slack <= p_hp, name='power_hp_max')
-    #cons_stor_max = m.add_constraints(E_HStor <= e_max, name='max_soc')
+    #cons_bess_max = m.add_constraints(E_HStor <= e_max, name='max_soc')
     #cons_stor_exchange = m.add_constraints(E_HStor.isel(t=range(1,len(set_time)-1)) == E_HStor.isel(t=range(0,len(set_time)-2)) + P_HStor.isel(t=range(0,len(set_time)-2)) * timesteplength, name='system_balance')
     #cons_stor_fix_last = m.add_constraints(P_HStor.isel(t=-1) == 0, name='p_hstor_fix_last_entry')
     # NO CIRCLE IN ROLLING HORIZON!: cons_stor_circle = m.add_constraints(E_HStor.isel(t=0) == E_HStor.isel(t=-2), name='power_hp_circle')
