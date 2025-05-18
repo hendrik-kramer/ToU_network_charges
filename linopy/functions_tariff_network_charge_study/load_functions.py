@@ -78,7 +78,7 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
             
             ct_csv = pd.read_csv(ct_file, skiprows=1)
             warnings.filterwarnings("ignore")
-            ct_csv = ct_csv.set_index(pd.to_datetime(ct_csv["Delivery day"])).drop(columns="Delivery day")
+            ct_csv = ct_csv.set_index(pd.to_datetime(ct_csv["Delivery day"], format="%d/%m/%Y")).drop(columns="Delivery day")
             warnings.filterwarnings("default")
             ct_csv = ct_csv.drop(ct_csv.columns[ct_csv.columns.str.contains("Hour") == False], axis=1)
             ct_csv.columns = ct_csv.columns.str.replace("Hour ","").str.replace("A","").str.replace("Q1","00:00").str.replace("Q2","15:00").str.replace("Q3","30:00").str.replace("Q4","45:00").str.replace(" ",":")
@@ -123,28 +123,21 @@ def get_tariff_prices(spot_prices_xr):
     
 
 
-def load_network_charges(input_filepath, which_dsos, timesteps):
+def load_network_charges(input_filepath, timesteps):
 
-    network_charges_hours = pd.read_excel(input_filepath, sheet_name=0)
-    network_charges_euro = pd.read_excel(input_filepath, sheet_name=1)
-
-    # reduce dsos to analyze
-    if type(which_dsos) == range or type(which_dsos) == list:
-        dsos = network_charges_hours["Netzbetreiber"][which_dsos].tolist()
-        
-        
-    # ====== DYNAMIC NETWORK CHARGE PRICES =====
+    network_charges_hours = pd.read_excel(input_filepath, sheet_name=0).head(100)
+    network_charges_euro = pd.read_excel(input_filepath, sheet_name=1).head(100)
     
-    network_levels_HSN = network_charges_hours[network_charges_hours["Netzbetreiber"].isin(dsos)].set_index("Netzbetreiber").rename_axis(None).iloc[:,0:96]
+    network_levels_HSN = network_charges_hours.set_index("Netzbetreiber").rename_axis(None).iloc[:,0:96]
     network_levels_S = network_levels_HSN.replace("H","S").replace("N","S")
-    array_quarters = network_charges_hours[network_charges_hours["Netzbetreiber"].isin(dsos)].set_index("Netzbetreiber").rename_axis(None).iloc[:,96:101].transpose()
+    array_quarters = network_charges_hours.set_index("Netzbetreiber").rename_axis(None).iloc[:,96:101].transpose()
     
     
     HSN_table_stacked = pd.DataFrame() # create empty pd
     quarter_title = ["Q1","Q2","Q3","Q4"]
     
-    for ct_q in quarter_title: # loop over all quarters
-        
+    dsos = network_charges_hours["Netzbetreiber"].to_list()
+    for ct_q in quarter_title: # loop over all quarters            
         HSN_table_temp = [network_levels_HSN.loc[nct] if array_quarters.loc[ct_q][nct] == 1 else network_levels_S.loc[nct] for nct in dsos] # get S or HSN
         HSN_table_temp = pd.DataFrame(HSN_table_temp).transpose()
         HSN_table_temp["Quarter"] = ct_q
@@ -310,12 +303,14 @@ def load_temperature(input_filepath_temperature, timesteps):
     return temperature_xr
 
 
-def load_irradiance(input_folderpath, parameter_file_capacities, timesteps):
+def load_irradiance(input_folderpath, parameter_file_capacities, parameter_file_fulloadhours, timesteps):
     
     hochrechung = pd.read_csv(input_folderpath, sep=";", decimal=',', na_values ={"N.A", "N.A."}).dropna(axis=0) # in MW, in UTC
     hochrechung["Zeit"] = pd.to_datetime(hochrechung["Zeit"], utc=True).dt.tz_convert("Europe/Berlin")
     
     capacity = pd.read_csv(parameter_file_capacities, sep=";")[0:4].set_index("capacity_MWp").transpose()
+
+    fullloadhours = pd.read_csv(parameter_file_fulloadhours)
     
     # normalize each timeseries per year to match in sum 1
     for ct_year in hochrechung["Zeit"].dt.year.unique():

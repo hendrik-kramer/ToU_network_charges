@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 # read  results
-folder_name = "2025-18-18_12-44_Q1_smart_charging_prosumage"
+folder_name = "2025-05-18_20-19_Q2_smart_charging_only_EV"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -46,7 +46,7 @@ result_SOC_MISSING["t"] = dti
 if (False):  # COST
       
     scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
-    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v","t"]),
+    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v"]),
                     'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim=["v","t"]) }
     
     x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations

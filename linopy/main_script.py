@@ -27,20 +27,13 @@ import functions_tariff_network_charge_study.load_functions as f_load
 #import functions_tariff_network_charge_study.model_emob_annual_forsight_parallel as model_emob_annual_forsight_smart
 import functions_tariff_network_charge_study.model_emob_annual_forsight_parallel2 as model2
 
-
-# ===== PARAMETERS ======
-
-# read in data
-
-which_dsos = range(0,100)   # 0 for all, otherwise use range or indices of xlsx file
-parameter_year = 2021 
-result_folder = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + "\\"
-
-
 warnings.simplefilter(action='ignore', category=UserWarning)      
 
 
+
+
 # get relevant timesteps to compute KW1-KW52/53
+parameter_year = 2024 
 timesteps = f_load.load_timesteps(parameter_year)
 
 # Load spot prices
@@ -49,32 +42,32 @@ spot_prices_xr = f_load.load_spot_prices(parameter_year, parameter_folderpath_pr
 tariff_price = f_load.get_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
-parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v3.xlsx"
-network_charges_xr = f_load.load_network_charges(parameter_filepath_dsos, which_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
+parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
+network_charges_xr = f_load.load_network_charges(parameter_filepath_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
 
 # Load e-Mobility
-parameter_folderpath_emob_demand = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_total_2021_test.csv"
-parameter_folderpath_emob_state = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_total_2021_test.csv"
+parameter_folderpath_emob_demand = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_total_moving_average_neu.csv"
+parameter_folderpath_emob_state = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_total_moving_average_neu.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
 emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0)   # CAN BE IMPROVED, ONLY FIRST SHOT
+# (pd.DataFrame(emob_departure_times, columns=["dept_time"]).groupby("dept_time").size()/len(emob_departure_times)).plot()
+
 
 # load irradiation // dummy value 
 #parameter_folder_irradiance = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation"
 parameter_file_hochrechung = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\netztransparenz\Hochrechnung Solarenergie [2025-03-21 13-55-15].csv" # in MW, in UTC
-parameter_file_capacities = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\install_capa_controllarea.csv" # in MW
+parameter_file_capacities = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\install_capa_controllarea_mid_year.csv" # in MW
+parameter_file_fulloadhours = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\mifri_pv_fullloadhours.csv" # in MW, in UTC
 
 # data not plausible (FLH) of 50hzt! Do not use
-irradiance_xr = np.round(f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, timesteps), decimals=3)
+irradiance_xr = np.round(f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, parameter_file_fulloadhours, timesteps), decimals=3)
 
 # load temperature // use dummy temperature (COSMO-REA6 from 2013) from nodal Flex paper as first guess --> needs to be updated
 # parameter_folderpath_temperature = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\temperature\temperature_nodalFlex.csv"
 # temperature_xr = f_load.load_temperature(parameter_folderpath_temperature, timesteps)
 
-
 warnings.simplefilter(action='default', category=UserWarning)      
-
-
 
 
 # Sanity check
@@ -82,14 +75,16 @@ if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(netw
     print("Error: timeseries do not have equal length")
 
 
+
+
 parameters_opti = {
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
-    "settings_setup": "prosumage", # "only_EV", # "prosumage"
-    "rolling_window": "no/year", # "year"
-    "quarter" : "Q2",
+    "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "prices": "spot", # "spot", "mean"
-    "dso_subset" : range(0,10),
-    "emob_subset" : range(0,6),
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "rolling_window": "day", # "no/year", "day"
+    "quarter" : "Q2",
+    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,3),
     "tso_subset" : range(1,2),
     }
 
@@ -112,33 +107,26 @@ parameters_model = {
     }
 
 
-length_chunk = 10
+length_dso_chunk = 5
 lst = parameters_opti["dso_subset"]
-division = len(lst) / length_chunk
-chunks = [lst[round(length_chunk * i):round(length_chunk * (i + 1))] for i in range(int(np.ceil(division)))]
-
-if (parameters_opti["rolling_window"] == "day") and (len(parameters_opti["dso_subset"]) < length_chunk):
-    raise ValueError("If rolling on daily basis, no chunks can be used")
+division = len(lst) / length_dso_chunk
+list_of_dso_chunks = [lst[round(length_dso_chunk * i):round(length_dso_chunk * (i + 1))] for i in range(int(np.ceil(division)))]
 
 
-
-
-#dso_names = network_charges_xr.r.to_numpy()[list(parameters_opti["dso_subset"])]
-
-time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index #range(0,96*30)
+# limit data to relevant values according to parameters mentioned above
+time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
 dso_subset = parameters_opti["dso_subset"]
 emob_subset = parameters_opti["emob_subset"]
 tso_subset = parameters_opti["tso_subset"]
-   
 timesteps = timesteps.iloc[time_subset]
 spot_prices_xr = spot_prices_xr.isel(t=time_subset)
 network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
 emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
 emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
 emob_departure_times = emob_departure_times.iloc[emob_subset]
-
 irradiance_xr = irradiance_xr.isel(t=time_subset, a=tso_subset)
 
+# enrich data
 emob_home_xr = (emob_state_xr=="home")
 emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean()).drop_vars("s")
 
@@ -150,7 +138,7 @@ _, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, em
 
 
 
-for chunk_dso in chunks:
+for chunk_dso in list_of_dso_chunks:
 
     print("   ")
     print("=== dso chunk: " + str(chunk_dso) + " == " + str(datetime.now()) + " ===")
@@ -159,14 +147,10 @@ for chunk_dso in chunks:
     # overwrite parameter for the loop
     parameters_opti["dso_subset"] = chunk_dso
     
-    
-    
-    
-    
+
     # create and run model
     # m = model_emob_annual_forsight_smart.model_emob_annual_smart(timesteps, spot_prices_xr, tariff_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters_model, parameters_opti)
     
-
 
     # initialize rolling planning timestep ranges
     if parameters_opti["rolling_window"] == "day":
@@ -246,38 +230,66 @@ for chunk_dso in chunks:
                 print(m["P_EV_NOT_HOME"].solution.sum(dim=["t","r","s"]))
 
 
+            # save daily results to common data structures of whole time horizon
             if ct_rolling[0] == 0:
-                result_C_OP = m["C_OP"].solution
-                result_C_OP_NO_PENALTY = m["C_OP_NO_PENALTY"].solution
-                result_SOC_EV = m["SOC_EV"].solution
-                result_P_BUY =  m["P_BUY"].solution
-                result_P_EV_NOT_HOME = m["P_EV_NOT_HOME"].solution
-                result_SOC_MISSING = m["SOC_MISSING"].solution
+                result_C_OP_roll = m["C_OP"].solution
+                result_C_OP_NO_PENALTY_roll = m["C_OP_NO_PENALTY"].solution
+                result_SOC_EV_roll = m["SOC_EV"].solution
+                result_P_BUY_roll =  m["P_BUY"].solution
+                result_P_EV_NOT_HOME_roll = m["P_EV_NOT_HOME"].solution
+                result_SOC_MISSING_roll = m["SOC_MISSING"].solution
                 
                 if parameters_opti["settings_setup"] == "prosumage":
-                    result_P_PV = m["P_PV"].solution
-                    result_SOC_BESS = m["SOC_BESS"].solution
+                    result_P_PV_roll = m["P_PV"].solution
+                    result_SOC_BESS_roll = m["SOC_BESS"].solution
 
             else:
-                result_C_OP = xr.concat([result_C_OP, m["C_OP"].solution], dim="t")
-                result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, m["C_OP_NO_PENALTY"].solution], dim="t")
-                
-                # time dependent
-                result_SOC_EV = xr.concat([result_SOC_EV, m["SOC_EV"].solution.isel(t=idx_today_opti)], dim="t")
-                result_P_BUY = xr.concat([result_P_BUY, m["P_BUY"].solution.isel(t=idx_today_opti)], dim="t")
-                result_P_EV_NOT_HOME = xr.concat([result_P_EV_NOT_HOME, m["P_EV_NOT_HOME"].solution.isel(t=idx_today_opti)], dim="t")
-                result_SOC_MISSING = xr.concat([result_SOC_MISSING, m["SOC_MISSING"].solution.isel(t=idx_today_opti)], dim="t")
+                result_C_OP_roll = result_C_OP_roll + m["C_OP"].solution
+                result_C_OP_NO_PENALTY_roll = result_C_OP_NO_PENALTY_roll + m["C_OP_NO_PENALTY"].solution
+                result_SOC_EV_roll = xr.concat([result_SOC_EV_roll, m["SOC_EV"].solution.isel(t=idx_today_opti)], dim="t")
+                result_P_BUY_roll = xr.concat([result_P_BUY_roll, m["P_BUY"].solution.isel(t=idx_today_opti)], dim="t")
+                result_P_EV_NOT_HOME_roll = xr.concat([result_P_EV_NOT_HOME_roll, m["P_EV_NOT_HOME"].solution.isel(t=idx_today_opti)], dim="t")
+                result_SOC_MISSING_roll = xr.concat([result_SOC_MISSING_roll, m["SOC_MISSING"].solution.isel(t=idx_today_opti)], dim="t")
                 
                 if parameters_opti["settings_setup"] == "prosumage":
-                    result_P_PV = xr.concat([result_P_PV, m["P_PV"].solution.isel(t=idx_today_opti)], dim="t")
-                    result_SOC_BESS = xr.concat([result_SOC_BESS, m["SOC_BESS"].solution.isel(t=idx_today_opti)], dim="t")
+                    result_P_PV_roll = xr.concat([result_P_PV_roll, m["P_PV"].solution.isel(t=idx_today_opti)], dim="t")
+                    result_SOC_BESS_roll = xr.concat([result_SOC_BESS_roll, m["SOC_BESS"].solution.isel(t=idx_today_opti)], dim="t")
                     
             first_iteration = False
             soc_ev_last = m["SOC_EV"].solution.isel(t=-1)
             
             if parameters_opti["settings_setup"] != "only_EV":
                 soc_bess_last = m["SOC_BESS"].solution.isel(t=-1)
+            
+                
+        # add dso chunks together
+        if chunk_dso[0] == 0:
+            result_C_OP = result_C_OP_roll
+            result_C_OP_NO_PENALTY = result_C_OP_NO_PENALTY_roll
+            result_SOC_EV =result_SOC_EV_roll
+            result_P_BUY =  result_P_BUY_roll
+            result_P_EV_NOT_HOME = result_P_EV_NOT_HOME_roll
+            result_SOC_MISSING = result_SOC_MISSING_roll
+            
+            if parameters_opti["settings_setup"] == "prosumage":
+                result_P_PV = result_P_PV_roll
+                result_SOC_BESS = result_SOC_BESS_roll
+                
+        else:
+            result_C_OP = xr.concat([result_C_OP, result_C_OP_roll], dim="r")
+            result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, result_C_OP_NO_PENALTY_roll], dim="r")
+            result_SOC_EV = xr.concat([result_SOC_EV, result_SOC_EV_roll], dim="r")
+            result_P_BUY = xr.concat([result_P_BUY_roll, m["P_BUY"].solution], dim="r")
+            result_P_EV_NOT_HOME = xr.concat([result_P_BUY, result_P_EV_NOT_HOME_roll], dim="r")
+            result_SOC_MISSING = xr.concat([result_SOC_MISSING, result_SOC_MISSING_roll], dim="r")
 
+            
+            if parameters_opti["settings_setup"] == "prosumage":
+                result_P_PV = xr.concat([result_P_PV, result_P_PV_roll], dim="r")
+                result_SOC_BESS = xr.concat([result_SOC_BESS, result_SOC_BESS_roll], dim="r")
+        
+    
+    # ====perfect foresight optimization  ====        
     else:
         
         for key in dict_idx_lookup:
@@ -287,11 +299,7 @@ for chunk_dso in chunks:
         m_status = m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
     
 
-
-    
-    
-        # ==== DISPLAY if infeasibility variables are positive =====
-        
+        # display infeasibility variables if applicable
         if m["SOC_MISSING"].solution.sum().item() > 0:
             print("Slack SOC_MISSING")
             print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
@@ -300,11 +308,8 @@ for chunk_dso in chunks:
             print("P_EV_NOT_HOME")
             print(m["P_EV_NOT_HOME"].solution.sum(dim=["t","r","s"]))
     
-    
-    
-    
-        # === store results in large xarray ===
-        
+
+        #  store total time horizon results in large dataset with all dsos 
         if chunk_dso[0] == 0:
             result_C_OP = m["C_OP"].solution
             result_C_OP_NO_PENALTY = m["C_OP_NO_PENALTY"].solution
@@ -319,7 +324,7 @@ for chunk_dso in chunks:
                 
         else:
             result_C_OP = xr.concat([result_C_OP, m["C_OP"].solution], dim="r")
-            result_C_OP_NO_PENALTY = xr.concat([result_C_OP, m["C_OP_NO_PENALTY"].solution], dim="r")
+            result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, m["C_OP_NO_PENALTY"].solution], dim="r")
             result_SOC_EV = xr.concat([result_SOC_EV, m["SOC_EV"].solution], dim="r")
             result_P_BUY = xr.concat([result_P_BUY, m["P_BUY"].solution], dim="r")
             result_P_EV_NOT_HOME = xr.concat([result_P_EV_NOT_HOME, m["P_EV_NOT_HOME"].solution], dim="r")
@@ -361,7 +366,7 @@ warnings.simplefilter(action='default', category=FutureWarning)
 #  ==== SAVE RESULTS =====
 
 # create new folder for results
-str_now = datetime.now().strftime("%Y-%d-%d_%H-%M")
+str_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["quarter"] + "_" + parameters_opti["settings_obj_fnct"] + "_" + parameters_opti["settings_setup"])
 os.makedirs(folder_path, exist_ok=True)
 
