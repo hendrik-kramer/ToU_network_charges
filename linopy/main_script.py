@@ -39,7 +39,7 @@ timesteps = f_load.load_timesteps(parameter_year)
 # Load spot prices
 parameter_folderpath_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
 spot_prices_xr = f_load.load_spot_prices(parameter_year, parameter_folderpath_prices, "id_auktion_15_uhr", timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
-tariff_price = f_load.get_tariff_prices(spot_prices_xr)
+tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
 parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
@@ -83,7 +83,7 @@ parameters_opti = {
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "Q2",
-    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
+    "dso_subset" : range(0,5), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,3),
     "tso_subset" : range(1,2),
     }
@@ -131,7 +131,8 @@ emob_home_xr = (emob_state_xr=="home")
 emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean()).drop_vars("s")
 
 timesteps_from_zero = timesteps.reset_index()
-_, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, -timesteps.index[0] )   # CAN BE IMPROVED, ONLY FIRST SHOT
+#_, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, -timesteps.index[0] )   # CAN BE IMPROVED, ONLY FIRST SHOT
+_, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0 )   # CAN BE IMPROVED, ONLY FIRST SHOT
 
 
 
@@ -140,10 +141,7 @@ _, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, em
 
 for chunk_dso in list_of_dso_chunks:
 
-    print("   ")
-    print("=== dso chunk: " + str(chunk_dso) + " == " + str(datetime.now()) + " ===")
-    print("   ")
-
+   
     # overwrite parameter for the loop
     parameters_opti["dso_subset"] = chunk_dso
     
@@ -155,12 +153,14 @@ for chunk_dso in list_of_dso_chunks:
     # initialize rolling planning timestep ranges
     if parameters_opti["rolling_window"] == "day":
         unique_days = timesteps["DateTime"].dt.date.unique()
+        
         rolling_timesteps = [range(0, 15*4)] # first day until 3 pm
         for ct_day in unique_days[:-1]: # until second last day
             ct_next_day = ct_day + timedelta(days=1)
             day_min_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_day) & (timesteps_from_zero["DateTime"].dt.hour == 15) & (timesteps_from_zero["DateTime"].dt.minute == 0)].index.item()
             day_max_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_next_day) & (timesteps_from_zero["DateTime"].dt.hour == 23) & (timesteps_from_zero["DateTime"].dt.minute == 45)].index.item()           
             rolling_timesteps.append( range(day_min_idx, day_max_idx+1))
+        
         # no necessity to optimize last half day if overlapping window is known until midnight d+1 anyway
         #rolling_timesteps.append( range(timesteps.iloc[[-9*4]].index.item(), timesteps.iloc[[-1]].index.item()+1)) # last day 3 pm to midnight
         [len(ct) for ct in rolling_timesteps]
@@ -169,7 +169,7 @@ for chunk_dso in list_of_dso_chunks:
         soc_ev_last = []
         soc_bess_last = []
         for ct_rolling in rolling_timesteps:
-            print("===== time " + str(ct_rolling) + " =====")
+            print("===== dso_chunk: " + str(chunk_dso) + ", time: " + str(ct_rolling) + " =====")
             
             timesteps_roll = timesteps.iloc[list(ct_rolling)]
             
@@ -196,7 +196,7 @@ for chunk_dso in list_of_dso_chunks:
             
             ct_rolling = timesteps_roll.index - timesteps.index[0]
             spot_prices_xr_roll = spot_prices_xr.isel(t=ct_rolling)
-            network_charges_xr_roll = network_charges_xr.isel(t=ct_rolling)
+            network_charges_xr_roll = network_charges_xr.isel(t=ct_rolling).isel(r=chunk_dso)
             emob_demand_xr_roll = emob_demand_xr.isel(t=ct_rolling)
             emob_state_xr_roll = emob_state_xr.isel(t=ct_rolling)
             irradiance_xr_roll = irradiance_xr.isel(t=ct_rolling)
@@ -205,7 +205,7 @@ for chunk_dso in list_of_dso_chunks:
 
             
             
-            m = model2.model_emob_annual_smart2(timesteps_roll, spot_prices_xr_roll, tariff_price, network_charges_xr_roll, emob_demand_xr_roll, emob_state_xr_roll, emob_departure_times, dict_idx_lookup_sub, irradiance_xr_roll, parameters_model, parameters_opti)
+            m = model2.model_emob_quarter_smart2(timesteps_roll, spot_prices_xr_roll, tariff_static_price, network_charges_xr_roll, emob_demand_xr_roll, emob_state_xr_roll, emob_departure_times, dict_idx_lookup_sub, irradiance_xr_roll, parameters_model, parameters_opti)
             m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
 
             #if ct_rolling[0] == 1788:
@@ -266,7 +266,7 @@ for chunk_dso in list_of_dso_chunks:
         if chunk_dso[0] == 0:
             result_C_OP = result_C_OP_roll
             result_C_OP_NO_PENALTY = result_C_OP_NO_PENALTY_roll
-            result_SOC_EV =result_SOC_EV_roll
+            result_SOC_EV = result_SOC_EV_roll
             result_P_BUY =  result_P_BUY_roll
             result_P_EV_NOT_HOME = result_P_EV_NOT_HOME_roll
             result_SOC_MISSING = result_SOC_MISSING_roll
@@ -279,7 +279,7 @@ for chunk_dso in list_of_dso_chunks:
             result_C_OP = xr.concat([result_C_OP, result_C_OP_roll], dim="r")
             result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, result_C_OP_NO_PENALTY_roll], dim="r")
             result_SOC_EV = xr.concat([result_SOC_EV, result_SOC_EV_roll], dim="r")
-            result_P_BUY = xr.concat([result_P_BUY_roll, m["P_BUY"].solution], dim="r")
+            result_P_BUY = xr.concat([result_P_BUY, result_P_BUY_roll], dim="r")
             result_P_EV_NOT_HOME = xr.concat([result_P_BUY, result_P_EV_NOT_HOME_roll], dim="r")
             result_SOC_MISSING = xr.concat([result_SOC_MISSING, result_SOC_MISSING_roll], dim="r")
 
@@ -295,7 +295,7 @@ for chunk_dso in list_of_dso_chunks:
         for key in dict_idx_lookup:
             dict_idx_lookup[key] = dict_idx_lookup[key][dict_idx_lookup[key].isin(timesteps.index)]
 
-        m = model2.model_emob_annual_smart2(timesteps_from_zero, spot_prices_xr, tariff_price, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters_model, parameters_opti)
+        m = model2.model_emob_quarter_smart2(timesteps_from_zero, spot_prices_xr, tariff_price, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters_model, parameters_opti)
         m_status = m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
     
 
@@ -353,10 +353,14 @@ result_C_OP_NO_PENALTY_eur = result_C_OP_NO_PENALTY/100 # ct --> eur
 
 # convert int64 of datetime object to seconds to be able to save netcdf
 idx_time = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
-result_P_BUY["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
-result_SOC_EV["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
-result_P_EV_NOT_HOME["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"] 
-result_SOC_MISSING["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]  
+result_P_BUY_1970 = result_P_BUY
+result_P_BUY_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
+result_SOC_EV_1970 = result_SOC_EV
+result_SOC_EV_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
+result_P_EV_NOT_HOME_1970 = result_P_EV_NOT_HOME
+result_P_EV_NOT_HOME_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"] 
+result_SOC_MISSING_1970 = result_SOC_MISSING
+result_SOC_MISSING_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]  
 
 warnings.simplefilter(action='default', category=FutureWarning)      
 
@@ -372,10 +376,10 @@ os.makedirs(folder_path, exist_ok=True)
 
 result_C_OP.to_netcdf(folder_path / "C_OP.nc")
 result_C_OP_NO_PENALTY_eur.to_netcdf(folder_path / "C_OP_NO_PENALTY.nc")
-result_SOC_EV.to_netcdf(folder_path / "SOC_EV.nc")
-result_P_BUY.to_netcdf(folder_path / "P_BUY.nc")
-result_P_EV_NOT_HOME.to_netcdf(folder_path / "P_EV_NOT_HOME.nc")
-result_SOC_MISSING.to_netcdf(folder_path / "SOC_MISSING.nc")
+result_SOC_EV_1970.to_netcdf(folder_path / "SOC_EV.nc")
+result_P_BUY_1970.to_netcdf(folder_path / "P_BUY.nc")
+result_P_EV_NOT_HOME_1970.to_netcdf(folder_path / "P_EV_NOT_HOME.nc")
+result_SOC_MISSING_1970.to_netcdf(folder_path / "SOC_MISSING.nc")
 
 with open(folder_path / "parameters_opti.txt", 'w') as f:
     f.write(pd.DataFrame.from_dict(parameters_opti, orient='index').to_string(header=False, index=True))

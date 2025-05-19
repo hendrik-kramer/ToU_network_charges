@@ -114,7 +114,7 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
     return prices_xr
 
 
-def get_tariff_prices(spot_prices_xr):
+def get_annual_static_tariff_prices(spot_prices_xr):
     
     tarrif_prices_xr = spot_prices_xr
     tarrif_prices_xr = np.round(spot_prices_xr.mean().item(), decimals=3)
@@ -189,8 +189,8 @@ def load_network_charges(input_filepath, timesteps):
 
     #print(network_charges_red_year)
     
-    network_charges_xr = xr.concat([xr.DataArray(network_charges_red_year, dims=['t','r']).expand_dims("s",axis=2), xr.DataArray(network_charges_reg_year, dims=['t','r']).expand_dims("s",axis=2)], dim="s")
-    network_charges_xr['s'] = ['red', 'reg']
+    network_charges_xr = xr.concat([xr.DataArray(network_charges_reg_year, dims=['t','r']).expand_dims("s",axis=2), xr.DataArray(network_charges_red_year, dims=['t','r']).expand_dims("s",axis=2)], dim="s")
+    network_charges_xr['s'] = ['reg', 'red']
     
     return network_charges_xr.astype(float)
 
@@ -280,7 +280,7 @@ def deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, shi
     unique_timesteps = timesteps["DateTime"].dt.time.unique()
     dict_id_timesteps = {}
     
-    for ct_ts in  unique_timesteps:
+    for ct_ts in unique_timesteps:
         dict_id_timesteps[ct_ts] = timesteps.index[ct_ts == timesteps["DateTime"].dt.time] + shift_timesteps_int
 
 

@@ -19,7 +19,7 @@ from pathlib import Path
 
 
 # read  results
-folder_name = "2025-05-18_20-19_Q2_smart_charging_only_EV"
+folder_name = "2025-05-19_16-02_Q2_smart_charging_only_EV"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -47,7 +47,7 @@ if (False):  # COST
       
     scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
     dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v"]),
-                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim=["v","t"]) }
+                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim=["v"]) }
     
     x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations
     width = 0.25  # the width of the bars
@@ -216,8 +216,17 @@ if (False):
 #print("Einsparung in Prozent: ", str(einsparung))
 
 
+#===============================
+# ERROR ASSESMENT
+# =============================
 
 
+
+axx1 = plt.subplot(2,1,1)
+result_P_BUY.sel(r='Westnetz').isel(v=0).to_pandas().plot(ax=axx1)
+
+axx2 = plt.subplot(2,1,2, sharex=axx1)
+(network_charges_xr + spot_prices_xr).sel(r="Westnetz").to_pandas().plot(ax=axx2)
 
 
 
