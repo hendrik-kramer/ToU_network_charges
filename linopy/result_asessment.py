@@ -14,12 +14,12 @@ from datetime import date, timedelta, datetime
 import numpy as np
 import xarray as xr
 from pathlib import Path
-
+import matplotlib.colors as mcolors
 
 
 
 # read  results
-folder_name = "2025-05-19_16-02_Q2_smart_charging_only_EV"
+folder_name = "2025-05-20_08-52_Q2_smart_charging_only_EV_r50_v10"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -43,7 +43,7 @@ result_SOC_MISSING["t"] = dti
 # ===== plotting ====
 
 
-if (False):  # COST
+if (False):  # BAR PLOT MEAN COST SAVINGS PER DSO
       
     scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
     dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v"]),
@@ -56,6 +56,8 @@ if (False):  # COST
     ct = 0
     
     fig, ax = plt.subplots(layout='constrained')
+    fig.set_figheight(5)
+    fig.set_figwidth(15)
 
     for attribute, measurement in dso_means.items():
         offset = width * ct
@@ -76,17 +78,55 @@ if (False):  # COST
 
 
 
+if (False): # LINKED BUY AND PRICE TIMESERIS
+    axx1 = plt.subplot(2,1,1)
+    result_P_BUY.sel(r='Westnetz').isel(v=0).to_pandas().plot(ax=axx1)
+    
+    axx2 = plt.subplot(2,1,2, sharex=axx1)
+    (network_charges_xr + spot_prices_xr).sel(r="Westnetz").to_pandas().plot(ax=axx2)
+
+
+if (False): # HEATMAP SAVINGS
+    
+    savings = (result_C_OP_NO_PENALTY_eur.sel(s="reg") - result_C_OP_NO_PENALTY_eur.sel(s="red")).to_pandas()
+    savings["row_sum"] = savings.sum(axis=1) 
+    savings_sorted = savings.sort_values("row_sum", ascending=False)
+    savings_sorted = savings_sorted.drop(columns=["row_sum"]).transpose()
+    savings_sorted_twice = savings_sorted.sort_values(savings_sorted.columns[0], axis="index", ascending=False)
+
+    
+
+    ude_colors = ['#efe4bf','#004c93']
+    cmap_ude = mcolors.LinearSegmentedColormap.from_list('ude', ude_colors)
+
+    fig_hm, ax_hm = plt.subplots(figsize=(15, 5)) 
+    heatmap = ax_hm.imshow(savings_sorted_twice.to_numpy(), cmap=cmap_ude, interpolation='nearest', aspect=2)
+    plt.xlabel('DSOs\n(columns sorted by column sum)')
+    plt.ylabel('Mobility patterns\n(rows sorted by values in first column)')
+    fig_hm.colorbar(heatmap, ax=ax_hm,  orientation="vertical", label="Savings when switching from regular \n to reduced network charges in €")
+
+
+
+if (False): # SAVINGS DEPENDENT ON MOBILITY BEHAVIOR (SCATTER)
+    
+
+    
+
+    
+    fig_km, ax_km = plt.subplots(figsize=(15, 5)) 
+    scatter = ax_km.scatter(emob_demand_quarter, savings_scatter)
+    
 if (False): # CHARGE POWER 
 
 
-    def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H="/", **kwargs):
+    def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H=".", **kwargs):
         """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
     labels is a list of the names of the dataframe, used for the legend
     title is a string for the title of the plot
     H is the hatch used for identification of the different dataframe"""
         import matplotlib as mpl
         from cycler import cycler
-        mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#666666", "#bbbbbb"])
+        mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#efe4bf", "#004c93"])
     
         n_df = len(dfall)
         n_col = len(dfall[0].columns) 
@@ -96,7 +136,8 @@ if (False): # CHARGE POWER
         
         for df in dfall : # for each data frame
             axe = df.plot(kind="bar",
-                          linewidth=0,
+                          edgecolor="black",
+                          linewidth=1,
                           stacked=True,
                           ax=axe,
                           legend=False,
@@ -128,6 +169,7 @@ if (False): # CHARGE POWER
             l2 = plt.legend(n, labels,  loc="upper right", ncol=2) # loc=[1.01, 0.1],
         axe.add_artist(l1)
         
+        # background grid lines
         axe.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
         axe.set_axisbelow(True)
         axe.set_ylim([0, 1.3*max(df_reg.max().max(), df_red.max().max())])
@@ -135,8 +177,8 @@ if (False): # CHARGE POWER
         return axe
 
     
-    df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum(dim=["t","v"])/4, "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum(dim=["t","v"])/4}, index=result_P_BUY["r"] )
-    df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum(dim=["t","v"])/4, "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum(dim=["t","v"])/4}, index=result_P_BUY["r"] )
+    df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum("t").mean("v")}, index=result_P_BUY["r"] )
+    df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum("t").mean("v")}, index=result_P_BUY["r"] )
 
     plot_clustered_stacked([df_reg, df_red],["regular network charges", "reduced network charges"], title="Energy consumed in kWh")
 
@@ -203,34 +245,6 @@ if (False):
     merge_result.plot.scatter(x='time_of_day',y='reg_spot', s="marker_size", alpha=0.3, xlabel="Time of the day", ylabel="charge price", ax=ax, c="blue", legend="regular")
     merge_result.plot.scatter(x='time_of_day',y='red_spot', s="marker_size", alpha=0.3, xlabel="Time of the day", ylabel="charge price", ax=ax, c="orange", legend="reduced")
     ax.legend(["regular", "reduced"])
-
-#print("result_SOC_MISSING = " + str(result_SOC_MISSING))
-
-#labels = m.compute_infeasibilities()
-#m.print_infeasibilities()
-
-
-
-#result_cost = (prices_xr * result_p).sum('t').to_pandas()
-#einsparung = (result_cost["reg"] - result_cost["red"]) / result_cost["reg"] * 100
-#print("Einsparung in Prozent: ", str(einsparung))
-
-
-#===============================
-# ERROR ASSESMENT
-# =============================
-
-
-
-axx1 = plt.subplot(2,1,1)
-result_P_BUY.sel(r='Westnetz').isel(v=0).to_pandas().plot(ax=axx1)
-
-axx2 = plt.subplot(2,1,2, sharex=axx1)
-(network_charges_xr + spot_prices_xr).sel(r="Westnetz").to_pandas().plot(ax=axx2)
-
-
-
-
 
 
 

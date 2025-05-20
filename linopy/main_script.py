@@ -64,7 +64,7 @@ parameter_file_fulloadhours = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\ir
 irradiance_xr = np.round(f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, parameter_file_fulloadhours, timesteps), decimals=3)
 
 # load temperature // use dummy temperature (COSMO-REA6 from 2013) from nodal Flex paper as first guess --> needs to be updated
-# parameter_folderpath_temperature = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\temperature\temperature_nodalFlex.csv"
+# parameter_foilderpath_temperature = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\temperature\temperature_nodalFlex.csv"
 # temperature_xr = f_load.load_temperature(parameter_folderpath_temperature, timesteps)
 
 warnings.simplefilter(action='default', category=UserWarning)      
@@ -82,16 +82,16 @@ parameters_opti = {
     "prices": "spot", # "spot", "mean"
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
-    "quarter" : "Q2",
-    "dso_subset" : range(0,5), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,3),
+    "quarter" : "Q3",
+    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,10),
     "tso_subset" : range(1,2),
     }
 
 parameters_model = {
     "ev_p_charge_home":11, # kW
     "ev_soc_max": 70, # kWh
-    "ev_soc_init": 0.9, # %
+    "ev_soc_init_rel": 0.9, # %
     "ev_soc_preference": 0.95, # %
     "ev_soc_departure": 0.95, # %
     "ev_p_charge_not_home": 22, # kW
@@ -99,7 +99,7 @@ parameters_model = {
     "ev_losses": 0.0001,
     "bess_p_max": 5, # kW
     "bess_soc_max": 9, # kWh
-    "bess_soc_init": 0.9, # %
+    "bess_soc_init_rel": 0.9, # %
     "bess_eta_ch": 0.95, # %
     "bess_eta_dch": 0.95, # %
     "bess_losses": 0.0001, # %
@@ -188,11 +188,11 @@ for chunk_dso in list_of_dso_chunks:
   
     
             if not(first_iteration):
-               parameters_model["ev_soc_init"] = soc_ev_last 
-               parameters_model["bess_soc_init"] = soc_bess_last
+               parameters_model["ev_soc_init_abs"] = soc_ev_last 
+               parameters_model["bess_soc_init_abs"] = soc_bess_last
             else:
-               parameters_model["ev_soc_init"] = parameters_model["ev_soc_init"] * parameters_model["ev_soc_max"]
-               parameters_model["bess_soc_init"] = parameters_model["bess_soc_init"] * parameters_model["bess_soc_max"]
+               parameters_model["ev_soc_init_abs"] = parameters_model["ev_soc_init_rel"] * parameters_model["ev_soc_max"]
+               parameters_model["bess_soc_init_abs"] = parameters_model["bess_soc_init_rel"] * parameters_model["bess_soc_max"]
             
             ct_rolling = timesteps_roll.index - timesteps.index[0]
             spot_prices_xr_roll = spot_prices_xr.isel(t=ct_rolling)

@@ -16,10 +16,9 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
 
     # calucalte arrival SOC --> TO BE UPDATED
-    e_init_percent = parameters["ev_soc_init"]
     soc_preference = parameters["ev_soc_preference"]
-    e_ev_init_percent = parameters["ev_soc_init"]
-    e_bess_init_percent = parameters["bess_soc_init"]
+    e_ev_init_percent = parameters["ev_soc_init_rel"]
+    e_bess_init_percent = parameters["bess_soc_init_rel"]
 
     
     warnings.simplefilter(action='ignore', category=FutureWarning)  
@@ -108,7 +107,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     cons_ev_charge_ev_max = m.add_constraints(P_EV <= emob_home_xr * parameters["ev_p_charge_home"], name='cons_ev_charge_home')
     cons_ev_charge_not_home = m.add_constraints(P_EV + P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_ev_charge_not_home')
 
-    cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == parameters["ev_soc_init"], name='cons_ev_init')
+    cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == parameters["ev_soc_init_abs"], name='cons_ev_init')
 
 
     # dedicated filling level when person usually departs from home
@@ -133,7 +132,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
          #cons_bess_max_p_bin_out = m.add_constraints(P_CH <= (-BIN_IN+1) * parameters["bess_p_ev"], name='cons_p_max_out')
          cons_bess_max_soc = m.add_constraints(SOC_BESS <= parameters["bess_soc_max"], name='cons_bess_max_soc')
          #cons_bess_circle = m.add_constraints(SOC_BESS.isel(t=1) == SOC_BESS.isel(t=len(set_time)-1))
-         cons_bess_init = m.add_constraints(SOC_BESS.isel(t=0) == parameters["bess_soc_init"], name='cons_bess_init')
+         cons_bess_init = m.add_constraints(SOC_BESS.isel(t=0) == parameters["bess_soc_init_abs"], name='cons_bess_init')
 
          cons_pv_p_max = m.add_constraints(P_PV <= (irradiance_xr * parameters["pv_p_max"]), name='cons_pv_p_max')
 
