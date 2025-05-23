@@ -305,31 +305,66 @@ def load_temperature(input_filepath_temperature, timesteps):
 
 def load_irradiance(input_folderpath, parameter_file_capacities, parameter_file_fulloadhours, timesteps):
     
-    hochrechung = pd.read_csv(input_folderpath, sep=";", decimal=',', na_values ={"N.A", "N.A."}).dropna(axis=0) # in MW, in UTC
-    hochrechung["Zeit"] = pd.to_datetime(hochrechung["Zeit"], utc=True).dt.tz_convert("Europe/Berlin")
+    hochrechnung = pd.read_csv(input_folderpath, sep=";", decimal=',', na_values ={"N.A", "N.A."}).dropna(axis=0) # in MW, in UTC
+    hochrechnung["Zeit"] = pd.to_datetime(hochrechnung["Zeit"], utc=True).dt.tz_convert("Europe/Berlin")
+    hochrechnung = hochrechnung.set_index("Zeit", drop=True)
+        
+    # heal missing data
+    hochrechnung_timesteps = pd.DataFrame(index=pd.date_range(start=hochrechnung.index[0], end=hochrechnung.index[-1], freq="15min"))
     
-    capacity = pd.read_csv(parameter_file_capacities, sep=";")[0:4].set_index("capacity_MWp").transpose()
+    hochrechnung = pd.merge(hochrechnung_timesteps, hochrechnung, left_index=True, right_index=True, how="left")
+    hochrechnung = hochrechnung.fillna(0)
+    
+    # Missing Feb 2 -- Feb 5
+    tmp_vals = np.array(hochrechnung.loc[(hochrechnung.index.date>=datetime.date(2024, 2, 7)) & (hochrechnung.index.date<=datetime.date(2024, 2, 10)), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']])
+    hochrechnung.loc[(hochrechnung.index.date>=datetime.date(2024, 2, 2)) & (hochrechnung.index.date<=datetime.date(2024, 2, 5)),['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = tmp_vals
 
-    fullloadhours = pd.read_csv(parameter_file_fulloadhours)
+    # Missing Mar 31
+    tmp_vals = np.array(hochrechnung.loc[hochrechnung.index.date==datetime.date(2024, 3, 30), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']])
+    hochrechnung.loc[(hochrechnung.index.date==datetime.date(2024, 3, 31)) ,['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = tmp_vals[0:92,:]
+
+    # Missing Mar 3 -- Mar 5
+    tmp_vals = np.array(hochrechnung.loc[(hochrechnung.index.date>=datetime.date(2024, 4, 6)) & (hochrechnung.index.date<=datetime.date(2024, 4, 8)), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']])
+    hochrechnung.loc[(hochrechnung.index.date>=datetime.date(2024, 4, 3)) & (hochrechnung.index.date<=datetime.date(2024, 4, 5)),['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = tmp_vals
+
+    #hochrechnung.loc[hochrechnung.index.date==datetime.date(2024, 3, 31), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = hochrechnung.loc[hochrechnung.index.date==datetime.date(2024, 3, 30), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] 
+    # hochrechnung_year = hochrechnung.loc[hochrechnung.index.year == 2024]
+
+    #hochrechnung.loc[:,['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = hochrechnung_splined.loc[:,['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']]
+   
+    #capacity = pd.read_csv(parameter_file_capacities, sep=";")[0:4].set_index("capacity_MWp").transpose()
     
     # normalize each timeseries per year to match in sum 1
-    for ct_year in hochrechung["Zeit"].dt.year.unique():
-        max_annual_val = capacity.loc[capacity.index == str(ct_year), ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].to_numpy()
-        # divison by four, as quarterly data is given
-        hochrechung.loc[hochrechung["Zeit"].dt.year == ct_year, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = \
-            hochrechung.loc[hochrechung["Zeit"].dt.year == ct_year, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].div(max_annual_val, axis=1) / 4
+    for ct_year in hochrechnung.index.year.unique():
         
-    #flh_test_intermed = hochrechung[['Zeit', '50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].set_index("Zeit")
-    #flh_test_intermed.index = flh_test_intermed.index.to_period('Y')  
-    #flh_test_intermed = flh_test_intermed.groupby(by="Zeit").mean()*8760
-    #flh_test_intermed.plot.bar()
-    
-    hochrechung_year_timesteps = pd.DataFrame(timesteps.DateTime).set_index("DateTime", drop=True)
-    hochrechung_year = hochrechung_year_timesteps.merge(hochrechung[['Zeit', '50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']], left_index=True, right_on="Zeit", how="left").set_index("Zeit",drop=True)
-    hochrechung_year = hochrechung_year.interpolate(method="spline", order=3, s=0, axis=0)
-    hochrechung_year[hochrechung_year<0] = 0
+        # annual sum
+        sum_annual_val = hochrechnung.loc[hochrechnung.index.year == ct_year, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].sum()
+        
+        if ct_year == 2024:
+            sum_annual_val_temp = hochrechnung.loc[hochrechnung.index.year == 2024, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].sum()
+        elif ct_year == 2025:
+            sum_annual_val = sum_annual_val_temp
 
-    irradiance_xr = xr.DataArray(hochrechung_year, dims=["t","a"])
+        
+        # normalize
+        hochrechnung.loc[hochrechnung.index.year == ct_year, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']] = \
+            hochrechnung.loc[hochrechnung.index.year == ct_year, ['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']].div(sum_annual_val, axis=1)
+            
+
+    hochrechnung_year_timesteps = pd.DataFrame(timesteps.DateTime).set_index("DateTime", drop=True)
+    hochrechnung_year = hochrechnung_year_timesteps.merge(hochrechnung[['50Hertz', 'Amprion', 'TenneT TSO', 'TransnetBW']], left_index=True, right_index=True, how="left")
+
+    hochrechnung_year["meanTSO"] = hochrechnung_year.mean(axis=1) # still normlized to one
+
+    # annual timeseries to reach fullloadhours of MiFri with one unit of power
+    # Multiplicatio by 4 to account for quarter hours --> hours
+    fullloadhours = pd.read_csv(parameter_file_fulloadhours, sep=";", index_col="Jahr").loc[hochrechnung_year.index[10].year,"Volllaststunden"]
+    hochrechnung_year = fullloadhours * hochrechnung_year 
+
+    hochrechnung_year["meanTSO"] = hochrechnung_year["meanTSO"]/hochrechnung_year["meanTSO"].sum() * fullloadhours # specifically rescale mean timeseries again to get rid of offset of end/beginning neighboring year's dates
+
+    irradiance_xr = xr.DataArray(hochrechnung_year, dims=["t","a"])
+    
     return irradiance_xr
 
 

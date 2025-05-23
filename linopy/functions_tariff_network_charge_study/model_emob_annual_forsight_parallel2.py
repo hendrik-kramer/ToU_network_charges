@@ -102,7 +102,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
     # EV Battery
     cons_ev_update = m.add_constraints(SOC_EV.isel(t=range(1,len(set_time))) == SOC_EV.isel(t=range(0,len(set_time)-1)) + timesteplength * (P_EV.isel(t=range(0,len(set_time)-1)) + P_EV_NOT_HOME.isel(t=range(0,len(set_time)-1)) - emob_demand_xr.isel(t=range(0,len(set_time)-1))) , name='cons_ev_update')
-    cons_ev_update_last_fix = m.add_constraints(P_EV.isel(t=len(set_time)-1) == 0, name='cons_ev_update_last_fix')
+    #cons_ev_update_last_fix = m.add_constraints(P_EV.isel(t=len(set_time)-1) == 0, name='cons_ev_update_last_fix')
     cons_ev_max_soc = m.add_constraints(SOC_EV <= parameters["ev_soc_max"], name='cons_ev_max_soc')
     cons_ev_charge_ev_max = m.add_constraints(P_EV <= emob_home_xr * parameters["ev_p_charge_home"], name='cons_ev_charge_home')
     cons_ev_charge_not_home = m.add_constraints(P_EV + P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_ev_charge_not_home')
@@ -123,8 +123,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
          # IN = increase power in househould = Discharging of BESS
          # OUT = withdrawal of household power = Injection into BESS
          cons_bess_update = m.add_constraints(SOC_BESS.isel(t=range(1,len(set_time))) == SOC_BESS.isel(t=range(0,len(set_time)-1)) + timesteplength * (parameters["bess_eta_ch"]*P_CH.isel(t=range(0,len(set_time)-1)) - 1/parameters["bess_eta_dch"]*P_DCH.isel(t=range(0,len(set_time)-1))) - parameters["bess_losses"], name='cons_bess_update')
-         cons_bess_update_last_fix_in = m.add_constraints(P_DCH.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_in')
-         cons_bess_update_last_fix_out = m.add_constraints(P_CH.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_out')
+         #cons_bess_update_last_fix_in = m.add_constraints(P_DCH.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_in')
+         #cons_bess_update_last_fix_out = m.add_constraints(P_CH.isel(t=len(set_time)-1) == 0, name='cons_bess_update_last_fix_out')
  
          cons_bess_max_P_DCH = m.add_constraints(P_DCH <= parameters["bess_p_max"], name='cons_p_max_in')
          cons_bess_max_P_CH = m.add_constraints(P_CH <= parameters["bess_p_max"], name='cons_p_max_out')
@@ -136,8 +136,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
          cons_pv_p_max = m.add_constraints(P_PV <= (irradiance_xr * parameters["pv_p_max"]), name='cons_pv_p_max')
 
-    if parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        cons_no_HT_charge = m.add_constraints(P_BUY <= emob_HT_xr * 999, name='cons_no_HT_charge')      # NOT NICE
+    #if parameters_opti["settings_obj_fnct"] == "scheduled_charging":
+    #    cons_no_HT_charge = m.add_constraints(P_BUY <= emob_HT_xr * 999, name='cons_no_HT_charge')      # NOT NICE
 
 
     # Home Balance
@@ -169,19 +169,21 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     #m.print_infeasibilities()  
     
     # zu minimierende Zielfunktion
-    if parameters_opti["settings_obj_fnct"] == "immediate_charging" or parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        obj = 9999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 999*SOC_MISSING.sum() 
+    if parameters_opti["settings_obj_fnct"] == "immediate_charging":
+        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 997*SOC_MISSING.sum() 
         cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
         #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
+    
+    elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
+        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 997*SOC_MISSING.sum() + 99999*(emob_HT_xr*P_BUY).sum()
+        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
+        #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
+    
     
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
         obj = (cost_xr*P_BUY +  (cost_xr +10)*P_EV_NOT_HOME).sum() +  999*SOC_MISSING.sum() 
         cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
         
-    #elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":    
-    #    obj = (cost_xr * (P_BUY + (cost_xr +10)*P_EV_NOT_HOME)).sum() +  999*SOC_MISSING.sum() 
-    #    cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr * (P_BUY + (cost_xr +10)*P_EV_NOT_HOME)).sum(dims="t"))
-
 
     m.add_objective(obj)
     

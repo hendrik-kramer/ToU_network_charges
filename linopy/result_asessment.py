@@ -70,7 +70,7 @@ if (False):  # BAR PLOT MEAN COST SAVINGS PER DSO
     ax.set_title('Charging at home, averaging over ' + str_v + ' different mobility use cases')
     ax.set_xticks(x + width)
     ax.set_xticklabels(scenarios, rotation=90)
-    ax.legend(loc='upper left', ncols=1)
+    ax.legend(loc='lower center', ncols=2)
     ax.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
     ax.set_axisbelow(True)
 
@@ -100,21 +100,137 @@ if (False): # HEATMAP SAVINGS
     cmap_ude = mcolors.LinearSegmentedColormap.from_list('ude', ude_colors)
 
     fig_hm, ax_hm = plt.subplots(figsize=(15, 5)) 
-    heatmap = ax_hm.imshow(savings_sorted_twice.to_numpy(), cmap=cmap_ude, interpolation='nearest', aspect=2)
+    heatmap = ax_hm.imshow(savings_sorted_twice.to_numpy(), cmap=cmap_ude, interpolation='nearest', aspect=1)
     plt.xlabel('DSOs\n(columns sorted by column sum)')
     plt.ylabel('Mobility patterns\n(rows sorted by values in first column)')
     fig_hm.colorbar(heatmap, ax=ax_hm,  orientation="vertical", label="Savings when switching from regular \n to reduced network charges in €")
 
+    fig_hm.savefig(folder_path / "heatmap_savings.svg")
 
 
-if (False): # SAVINGS DEPENDENT ON MOBILITY BEHAVIOR (SCATTER)
+
+if (False): # SAVINGS DEPENDENT ON MILEAGE BEHAVIOR (SCATTER + LIN REG)
     
 
+    emob_demand_quarter = np.repeat(emob_demand_xr.sum("t").to_numpy(), result_C_OP_NO_PENALTY_eur["r"].size)
+    savings_scatter = (result_C_OP_NO_PENALTY_eur.sel(s="reg") - result_C_OP_NO_PENALTY_eur.sel(s="red") ).to_numpy().reshape([result_C_OP_NO_PENALTY_eur.sel(s="reg").size, ])
     
-
+    savings_true = (savings_scatter != 0)
+    emob_demand_quarter_pos = emob_demand_quarter[savings_true]
+    savings_scatter_pos = savings_scatter[savings_true]
+    
     
     fig_km, ax_km = plt.subplots(figsize=(15, 5)) 
-    scatter = ax_km.scatter(emob_demand_quarter, savings_scatter)
+    scatter = ax_km.scatter(emob_demand_quarter_pos, savings_scatter_pos, alpha=0.3)
+    
+    coef = np.polyfit(emob_demand_quarter_pos,savings_scatter_pos,1)
+    poly1d_fn = np.poly1d(coef) 
+    str(poly1d_fn)
+    
+    x = np.arange(1000)
+    y = poly1d_fn(x)
+    plt.plot(x, y, linestyle="--", color="k", label=str("y = " + str(poly1d_fn) ))
+    plt.legend()
+    
+    plt.xlim([300,700])
+    plt.xlabel("Energy consumption in kWh")
+    plt.ylabel("Savings in €")
+    plt.show()
+    
+    fig_km.savefig(folder_path / "savings_per_energy_consumed_milage.svg")
+    
+    
+    
+if (False): # PEAK REDUCTION HEATMAP
+    
+    time_index = result_P_BUY["t"].to_pandas().index.hour
+    time_index_evening = ((time_index >= 17) & (time_index <= 21))
+
+    peak_reduction = (result_P_BUY.sel(s="reg", t=time_index_evening).max("t")-result_P_BUY.sel(s="red", t=time_index_evening).max("t")).to_pandas()
+    peak_reduction["row_sum"] = peak_reduction.sum(axis=1) 
+    peak_reduction_sorted = peak_reduction.sort_values("row_sum", ascending=False)
+    peak_reduction_sorted = peak_reduction_sorted.drop(columns=["row_sum"]).transpose()
+    peak_reduction_sorted_twice = peak_reduction_sorted.sort_values(peak_reduction_sorted.columns[0], axis="index", ascending=False)
+    
+    ude_colors = ['#8b2d0d', 'white', '#004c93'] # rot weiß blau   #sand  #efe4bf'
+    cmap_ude = mcolors.LinearSegmentedColormap.from_list('ude', ude_colors)
+
+    fig_kw_reduction, ax_hm = plt.subplots(figsize=(15, 5)) 
+    heatmap_power = ax_hm.imshow(peak_reduction_sorted_twice.to_numpy(), cmap=cmap_ude, vmin=-11, vmax=11, interpolation='nearest', aspect=2)
+    plt.xlabel('DSOs\n(columns sorted by column sum)')
+    plt.ylabel('Mobility patterns\n(rows sorted by values in first column)')
+    fig_kw_reduction.colorbar(heatmap_power, ax=ax_hm,  orientation="vertical", label="Peak reduction in kW when switching from regular \n to reduced network charges in kW")
+    plt.tight_layout()
+
+    fig_kw_reduction.savefig(folder_path / "hpeak_reduction_savings.svg")
+    
+    
+    
+if (False): # PRICE COMPARISON
+
+    # Dynamic price minus Average price of rolling period (15 pm to 15pm next day) 
+    
+    dso_col = "EWE NETZ"
+    
+        
+    ude_colors_inv = ['#004c93', 'white', '#8b2d0d'] # blau weiß rot   #sand  #efe4bf'
+    cmap_ude_inv = mcolors.LinearSegmentedColormap.from_list('ude_inv', ude_colors_inv)
+    
+    time_index = spot_prices_xr["t"].to_pandas().index.hour
+    #time_index_evening = ((time_index >= 17) & (time_index <= 21))
+
+    signal = pd.DataFrame([spot_prices_xr.to_pandas()]).transpose().rename(columns={0:"value"})
+    signal["Date"] = signal.index.strftime("%Y-%m-%d")
+    signal["Time"] = signal.index.strftime("%H_%M")
+
+    signal_spot_pivot = pd.pivot_table(signal, index=signal.Date, columns=signal.Time, values="value")
+    col_names  = [a + "+1" for a in signal_pivot.columns[0:15*4]]
+
+    signal_spot_15_15 = pd.merge(signal_pivot, pd.DataFrame(signal_spot_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_spot_pivot.index), left_index=True, right_index=True)
+    signal_spot_15_15 = signal_15_15.iloc[:,15*4:]
+
+    daily_mean_spot_price = signal_spot_15_15.mean(axis=1)
+    rel_signal_spot_15_15 = signal_spot_15_15.sub(daily_mean_spot_price, axis=0)
+    
+    # netwrork charges
+    network_charge_reduction = (network_charges_xr.sel(s="red")-network_charges_xr.sel(s="reg")).to_pandas()
+    network_charge_reduction["Date"] = signal.index.strftime("%Y-%m-%d")
+    network_charge_reduction["Time"] = signal.index.strftime("%H_%M")
+    
+    signal_nc_pivot = pd.pivot_table(network_charge_reduction, index=network_charge_reduction.Date, columns=network_charge_reduction.Time, values=dso_col)
+    signal_nc_15_15 = pd.merge(signal_nc_pivot, pd.DataFrame(signal_nc_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_nc_pivot.index), left_index=True, right_index=True)
+    signal_nc_15_15 = signal_nc_15_15.iloc[:,15*4:]
+
+
+    fig_signal, axes_signal = plt.subplots(nrows=1, ncols=3, figsize=(15, 4))
+
+    heatmap_spot = axes_signal[0].imshow(rel_signal_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
+    axes_signal[0].set_title("Spot price minus mean daily spot price")
+    plt.xlabel('Hour')
+    plt.ylabel('Day')
+    axes_signal[0].set_xticks(range(0,96,4), rel_signal_15_15.columns[range(0,96,4)], rotation=90)
+    axes_signal[0].set_yticks(range(0,len(rel_signal_15_15)), rel_signal_15_15.index, rotation=0)
+    fig_kw_reduction.colorbar(heatmap_spot, ax=axes_signal[0],  orientation="vertical", extend="both")
+
+    heatmap_nc = axes_signal[1].imshow(signal_nc_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
+    axes_signal[1].set_title("+ ToU network charge minus regular network charge")
+    plt.xlabel('Hour')
+    plt.ylabel('Day')
+    axes_signal[1].set_xticks(range(0,96,4), signal_nc_15_15.columns[range(0,96,4)], rotation=90)
+    axes_signal[1].set_yticks(range(0,len(signal_nc_15_15)), signal_nc_15_15.index, rotation=0)
+    fig_kw_reduction.colorbar(heatmap_nc, ax=axes_signal[1],  orientation="vertical", extend="both")
+
+
+    heatmap_signal = axes_signal[2].imshow(signal_nc_15_15+rel_signal_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
+    axes_signal[2].set_title("= Network charge and spot signal added")
+    plt.xlabel('Hour')
+    plt.ylabel('Day')
+    axes_signal[2].set_xticks(range(0,96,4), signal_nc_15_15.columns[range(0,96,4)], rotation=90)
+    axes_signal[2].set_yticks(range(0,len(signal_nc_15_15)), signal_nc_15_15.index, rotation=0)
+    fig_kw_reduction.colorbar(heatmap_signal, ax=axes_signal[2],  orientation="vertical", extend="both")
+
+
+
     
 if (False): # CHARGE POWER 
 

@@ -61,7 +61,7 @@ parameter_file_capacities = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irra
 parameter_file_fulloadhours = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\mifri_pv_fullloadhours.csv" # in MW, in UTC
 
 # data not plausible (FLH) of 50hzt! Do not use
-irradiance_xr = np.round(f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, parameter_file_fulloadhours, timesteps), decimals=3)
+irradiance_xr = f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, parameter_file_fulloadhours, timesteps)
 
 # load temperature // use dummy temperature (COSMO-REA6 from 2013) from nodal Flex paper as first guess --> needs to be updated
 # parameter_foilderpath_temperature = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\temperature\temperature_nodalFlex.csv"
@@ -78,14 +78,14 @@ if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(netw
 
 
 parameters_opti = {
-    "settings_setup": "only_EV", # "only_EV", # "prosumage"
+    "settings_setup": "prosumage", # "only_EV", # "prosumage"
     "prices": "spot", # "spot", "mean"
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
-    "quarter" : "Q3",
+    "quarter" : "Q2",
     "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,10),
-    "tso_subset" : range(1,2),
+    "tso_subset" : range(4,5),
     }
 
 parameters_model = {
@@ -102,7 +102,7 @@ parameters_model = {
     "bess_soc_init_rel": 0.9, # %
     "bess_eta_ch": 0.95, # %
     "bess_eta_dch": 0.95, # %
-    "bess_losses": 0.0001, # %
+    "bess_losses": 0.01, # %
     "pv_p_max": 8 # kW
     }
 
@@ -126,9 +126,6 @@ emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
 emob_departure_times = emob_departure_times.iloc[emob_subset]
 irradiance_xr = irradiance_xr.isel(t=time_subset, a=tso_subset)
 
-# enrich data
-emob_home_xr = (emob_state_xr=="home")
-emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean()).drop_vars("s")
 
 timesteps_from_zero = timesteps.reset_index()
 #_, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, -timesteps.index[0] )   # CAN BE IMPROVED, ONLY FIRST SHOT
