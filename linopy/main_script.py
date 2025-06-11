@@ -80,7 +80,7 @@ if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(netw
 parameters_opti = {
     "settings_setup": "prosumage", # "only_EV", # "prosumage"
     "prices": "spot", # "spot", "mean"
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_obj_fnct": "scheduled_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "Q2",
     "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
@@ -185,8 +185,8 @@ for chunk_dso in list_of_dso_chunks:
   
     
             if not(first_iteration):
-               parameters_model["ev_soc_init_abs"] = soc_ev_last 
-               parameters_model["bess_soc_init_abs"] = soc_bess_last
+               parameters_model["ev_soc_init_abs"] = np.minimum(soc_ev_last , parameters_model["ev_soc_max"])
+               parameters_model["bess_soc_init_abs"] = np.minimum(soc_bess_last, parameters_model["bess_soc_max"])
             else:
                parameters_model["ev_soc_init_abs"] = parameters_model["ev_soc_init_rel"] * parameters_model["ev_soc_max"]
                parameters_model["bess_soc_init_abs"] = parameters_model["bess_soc_init_rel"] * parameters_model["bess_soc_max"]
