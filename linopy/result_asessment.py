@@ -15,11 +15,11 @@ import numpy as np
 import xarray as xr
 from pathlib import Path
 import matplotlib.colors as mcolors
-
+import matplotlib.cm as cm
 
 
 # read  results
-folder_name = "2025-05-20_08-52_Q2_smart_charging_only_EV_r50_v10"
+folder_name = "2025-05-22_11-09_Q2_scheduled_charging_only_EV_r50_v10"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -94,17 +94,28 @@ if (False): # HEATMAP SAVINGS
     savings_sorted = savings_sorted.drop(columns=["row_sum"]).transpose()
     savings_sorted_twice = savings_sorted.sort_values(savings_sorted.columns[0], axis="index", ascending=False)
 
-    
+    # get specific colorbar
+    max_val = savings_sorted.max().max()    
+    min_val = savings_sorted.min().min()    
+    zero_fraction = np.abs(min_val) / (np.abs(min_val) + np.abs(max_val))
+
+    #mycmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', [(0,"red"),(zero_fraction, "white"), (1, "blue")], 256)
+    mycmap = mcolors.LinearSegmentedColormap.from_list('my_colormap', [(0,"red"),(0.33, "white"), (1, "blue")], 256)
+
+
 
     ude_colors = ['#efe4bf','#004c93']
     cmap_ude = mcolors.LinearSegmentedColormap.from_list('ude', ude_colors)
 
-    fig_hm, ax_hm = plt.subplots(figsize=(15, 5)) 
-    heatmap = ax_hm.imshow(savings_sorted_twice.to_numpy(), cmap=cmap_ude, interpolation='nearest', aspect=1)
-    plt.xlabel('DSOs\n(columns sorted by column sum)')
-    plt.ylabel('Mobility patterns\n(rows sorted by values in first column)')
-    fig_hm.colorbar(heatmap, ax=ax_hm,  orientation="vertical", label="Savings when switching from regular \n to reduced network charges in €")
-
+    fig_hm, ax_hm = plt.subplots(figsize=(15, 6)) 
+    heatmap = ax_hm.imshow(savings_sorted_twice.to_numpy(), cmap=mycmap, interpolation='nearest', aspect=2, vmin=-50, vmax=100)
+    plt.xlabel('DSOs (columns sorted by column sum)', fontsize=20)
+    plt.ylabel('Mobility patterns\n(rows sorted by \n values in first column)', fontsize=20)
+    plt.title("Savings when switching from regular to reduced network charges in €", fontsize=20)
+    ax_hm.tick_params(axis='both', which='major', labelsize=20)
+    cbar = fig_hm.colorbar(heatmap, ax=ax_hm,  orientation="vertical")
+    cbar.ax.tick_params(size=20, labelsize=20)
+    
     fig_hm.savefig(folder_path / "heatmap_savings.svg")
 
 
@@ -155,14 +166,17 @@ if (False): # PEAK REDUCTION HEATMAP
     ude_colors = ['#8b2d0d', 'white', '#004c93'] # rot weiß blau   #sand  #efe4bf'
     cmap_ude = mcolors.LinearSegmentedColormap.from_list('ude', ude_colors)
 
-    fig_kw_reduction, ax_hm = plt.subplots(figsize=(15, 5)) 
+    fig_kw_reduction, ax_hm = plt.subplots(figsize=(15, 6)) 
     heatmap_power = ax_hm.imshow(peak_reduction_sorted_twice.to_numpy(), cmap=cmap_ude, vmin=-11, vmax=11, interpolation='nearest', aspect=2)
-    plt.xlabel('DSOs\n(columns sorted by column sum)')
-    plt.ylabel('Mobility patterns\n(rows sorted by values in first column)')
-    fig_kw_reduction.colorbar(heatmap_power, ax=ax_hm,  orientation="vertical", label="Peak reduction in kW when switching from regular \n to reduced network charges in kW")
+    plt.xlabel('DSOs (columns sorted by column sum)', fontsize=20)
+    plt.ylabel('Mobility patterns\n(rows sorted by values \n in first column)', fontsize=20)
+    plt.title("Peak reduction in kW when switching from regular to reduced network charges in kW", fontsize=20)
+    cbar = fig_kw_reduction.colorbar(heatmap_power, ax=ax_hm,  orientation="vertical")
+    cbar.ax.tick_params(size=20, labelsize=20)
+
     plt.tight_layout()
 
-    fig_kw_reduction.savefig(folder_path / "hpeak_reduction_savings.svg")
+    fig_kw_reduction.savefig(folder_path / "peak_reduction_savings.svg")
     
     
     
@@ -187,7 +201,7 @@ if (False): # PRICE COMPARISON
     col_names  = [a + "+1" for a in signal_pivot.columns[0:15*4]]
 
     signal_spot_15_15 = pd.merge(signal_pivot, pd.DataFrame(signal_spot_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_spot_pivot.index), left_index=True, right_index=True)
-    signal_spot_15_15 = signal_15_15.iloc[:,15*4:]
+    signal_spot_15_15 = signal_spot_15_15.iloc[:,15*4:]
 
     daily_mean_spot_price = signal_spot_15_15.mean(axis=1)
     rel_signal_spot_15_15 = signal_spot_15_15.sub(daily_mean_spot_price, axis=0)
@@ -200,8 +214,7 @@ if (False): # PRICE COMPARISON
     signal_nc_pivot = pd.pivot_table(network_charge_reduction, index=network_charge_reduction.Date, columns=network_charge_reduction.Time, values=dso_col)
     signal_nc_15_15 = pd.merge(signal_nc_pivot, pd.DataFrame(signal_nc_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_nc_pivot.index), left_index=True, right_index=True)
     signal_nc_15_15 = signal_nc_15_15.iloc[:,15*4:]
-
-
+   
     fig_signal, axes_signal = plt.subplots(nrows=1, ncols=3, figsize=(15, 4))
 
     heatmap_spot = axes_signal[0].imshow(rel_signal_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
@@ -301,6 +314,8 @@ if (False): # CHARGE POWER
     fig.savefig(folder_path / "dso_energy_barlot.svg")
     
     
+    
+
 
 
 if (True): # EV SOC

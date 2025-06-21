@@ -15,6 +15,8 @@ import numpy as np
 import xarray as xr
 from pathlib import Path
 import matplotlib.colors as mcolors
+from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
+
 import glob
 import os
 import warnings
@@ -71,24 +73,59 @@ all_prices_pivot_sorted.columns = all_prices_pivot_sorted.columns.str[0:-3]
 all_prices_pivot_sorted_wo_timeshift = pd.concat([all_prices_pivot_sorted.iloc[:,0:12], all_prices_pivot_sorted.iloc[:,16:]], axis=1)
 
 fig_signal, ax_signal = plt.subplots(layout='constrained')
-fig_signal.set_figheight(5)
+fig_signal.set_figheight(6)
 fig_signal.set_figwidth(18)
-ax_signal = all_prices_pivot_sorted_wo_timeshift.plot(ax=ax_signal, kind="box", color=dict(boxes='black', whiskers='black', medians='r', caps='black'), showfliers=False, grid=False)
-ax_signal.set_ylim(-12,12)
-ax_signal.set_xticklabels(all_prices_pivot_sorted_wo_timeshift.columns, rotation=90)
-ax_signal.set_yticks([-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12])
+
+# put evening hours up front
+all_prices_pivot_sorted_wo_timeshift_eve = pd.concat([all_prices_pivot_sorted_wo_timeshift.iloc[:,61:], all_prices_pivot_sorted_wo_timeshift.iloc[:,0:60]], axis=1)
+
+ax_signal = all_prices_pivot_sorted_wo_timeshift_eve.plot(ax=ax_signal, kind="box", whis=(10, 90), patch_artist=True, color=dict(boxes='black', whiskers='black', medians='darkred', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+
+
+q95 = all_prices_pivot_sorted_wo_timeshift_eve.quantile(q=0.95).to_frame().reset_index().reset_index()
+q95["index"] = q95["index"].shift(-1)
+q05 = all_prices_pivot_sorted_wo_timeshift_eve.quantile(q=0.05).to_frame().reset_index().reset_index()
+q05["index"] = q05["index"].shift(-1)
+q05["hour_str"] = q05["time"].str.split(":").str[0].astype(str)
+
+
+
+ax_singal2= q95.plot(ax=ax_signal, x="index", y=0.95, kind="scatter", marker="_", color="k", zorder=2)
+ax_singal2.xaxis.set_visible(False)
+ax_singal3 = q05.plot(ax=ax_signal, x="index", y=0.05, kind="scatter", marker="_", color="k", zorder=2)
+ax_singal3.set_xticklabels(q05["hour_str"])
+
+ax_singal3.xaxis.set_visible(True)
+
+#ax_singal3.set_xticklabels(list(q05["hour_str"]))
+
+for i, label in enumerate(ax_singal3.get_xticklabels()):
+    if i % 4 != 0:
+        label.set_visible(False)  # Hide labels not multiple of 4
+    
+
 ax_signal.grid(which='major', axis='y', linestyle='--', color="lightgray")
-ax_signal.set_ylabel("Price minus daily mean price")
-ax_signal.set_xlabel("Time of the day")
-ax_signal.set_title("IDA(1) prices from 2018 through 2024 -- auction price minus mean of prices between 15:00 and 14:45 D+1")
+ax_signal.set_ylabel("Electricity price difference in ct/kWh", fontsize=20)
+ax_signal.set_xlabel("Hour of the day", fontsize=20)
+ax_signal.set_title("End-consumer retail price minus mean retail price of planning horizon", fontsize=20)
+ax_signal.set_yticks([-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12])
+ax_signal.set_ylim(-12,14)
 
 ax_signal.hlines(y=[0], xmin=-1, xmax=98, colors=['lightgray'], linestyles=['-'], linewidth=2, zorder=0)
+ax_signal.vlines(x=np.arange(1, 97, 4), ymin=-20, ymax=20, colors=['lightgray'], linestyles=['--'], linewidth=1, zorder=0)
+
 ax_signal.set_xlim(0,97)
 fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_spot_signal.svg", format="svg")
 
 
 
+
+
+
 # ===== LOAD NETWORK CHARGES ====
+
+# run main script until loop before to get variables
+
 timesteps_all = pd.DataFrame()
 for ct_year in [2018, 2019, 2020, 2021, 2022, 2023, 2024]:
     timesteps_ct = f_load.load_timesteps(ct_year)
@@ -103,35 +140,61 @@ network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_yea
 network_charges_signal = network_charges_pandas_all_years_unique_no_2025 - network_charges_pandas_all_years_unique_no_2025.median()
 
 
+
+
+
+
 # ===== SCATTER PLOT =====
 
 fig_signal_scatter, ax_ssc = plt.subplots(layout='constrained')
-fig_signal_scatter.set_figheight(3)
-fig_signal_scatter.set_figwidth(15)
+fig_signal_scatter.set_figheight(7)
+fig_signal_scatter.set_figwidth(21)
    
 x_vals = []
 y_vals = []
 
 for ct_dsos in network_charges_signal.columns:
     htnt = (network_charges_signal[ct_dsos] != 0)
-    ax_ssc.scatter(all_prices["spot_signal_ct_kWh"][htnt.values], network_charges_signal[ct_dsos][htnt.values], alpha=0.005, facecolor="blue")
-    
+    #ax_ssc.scatter(all_prices["spot_signal_ct_kWh"][htnt.values], network_charges_signal[ct_dsos][htnt.values], alpha=0.002, facecolor="blue", zorder=1)  
     y_vals.extend(list( network_charges_signal[ct_dsos][htnt.values]))
     x_vals.extend(list( all_prices["spot_signal_ct_kWh"][htnt.values]))
 
-    
-ax_ssc.set_xlim(-100,100)    
-ax_ssc.set_ylim(-12,12)    
+pd_all_data = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
+pd_all_data_selected = pd_all_data[(pd_all_data.xvals>=-45) & (pd_all_data.xvals<=45)]
 
-ax_ssc.hlines(y=[0], xmin=-100, xmax=100, colors=['k'], linestyles=['--'], linewidth=2, zorder=2)
-ax_ssc.vlines(x=[0], ymin=-12, ymax=12, colors=['k'], linestyles=['--'], linewidth=2, zorder=2)
-ax_ssc.axline([-100, -100], [100, 100], color="k", linestyle="--", linewidth=2)
+len(pd_all_data_selected) / len(pd_all_data) # data not in plot
 
-ax_ssc.grid(True, color="lightgray")
+ax_ssc.axis('equal')
 
-ax_ssc.set_xlabel("energy price signal in ct/kWh")
-ax_ssc.set_ylabel("network charge signal in ct/kWh")
-ax_ssc.set_ylabel("2018 through 2024")
+xx = 40
+yy = 40/3
+
+heatmap, xedges, yedges = np.histogram2d(pd_all_data_selected.xvals, pd_all_data_selected.yvals, bins=[600,200])
+heatmap = np.where(heatmap==0, np.nan, heatmap)
+extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
+hist_signal = ax_ssc.imshow(heatmap.T, extent=extent, origin='lower', cmap="viridis_r", aspect="auto" )
+fig_signal_scatter.colorbar(hist_signal, label="Data observations", orientation="vertical")  
+
+ax_ssc.set_xlim(xmin=-xx, xmax=xx)
+ax_ssc.set_ylim(-yy,yy)
+
+ax_ssc.hlines(y=[0], xmin=-xx, xmax=xx, colors=['k'], linestyles=['-'], linewidth=1, zorder=2)
+ax_ssc.vlines(x=[0], ymin=-yy, ymax=yy, colors=['k'], linestyles=['-'], linewidth=1, zorder=2)
+ax_ssc.axline([-yy, -yy], [yy, yy], color="k", linestyle="-", linewidth=1)
+
+
+# Change major ticks to show every 20.
+ax_ssc.xaxis.set_major_locator(MultipleLocator(5))
+ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
+
+
+ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
+
+ax_ssc.set_xlabel("energy price signal (IDA1) in ct/kWh \n \xa0 \n below  ← | → above \n the mean electricity price in planning period")
+ax_ssc.set_ylabel("network charge signal in ct/kWh \n \xa0 \n Standard minus low  ← | → High minus standard")
+ax_ssc.set_title("Relationship between energy and network signal")
+
+
 
 x_vec  = np.array(x_vals).round(4)[~np.isnan(x_vals)]
 y_vec  = np.array(y_vals).round(4)[~np.isnan(x_vals)]
@@ -150,7 +213,20 @@ sstot = np.sum((y_vec - ybar)**2)    # or sum([ (yi - ybar)**2 for yi in y])
 det = ssreg / sstot
  
 x_linsp = np.linspace(-100,100)
-ax_ssc.plot(x_linsp, coeffs[0]*x_linsp + coeffs[1], color="red" ) 
+ax_ssc.plot(x_linsp, coeffs[0]*x_linsp + coeffs[1], color="lightblue", linestyle=":") 
 
+q1_spot_stronger = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) > np.array(y_vals)))
+q1_nc_stronger = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) < np.array(y_vals)))
+
+q2 = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) > 0))
+
+q3_nc_stronger = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) > np.array(y_vals)))
+q3_spot_stronger = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) < np.array(y_vals)))
+
+q4 = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0))
+
+
+#fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_signals.svg", format="svg")
+fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_signals.svg", format="svg")
 
 
