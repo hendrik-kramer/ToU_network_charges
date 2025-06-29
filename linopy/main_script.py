@@ -71,8 +71,8 @@ warnings.simplefilter(action='default', category=UserWarning)
 
 
 # Sanity check
-if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(network_charges_xr) :
-    print("Error: timeseries do not have equal length")
+if (len(emob_demand_xr) != len(spot_prices_xr)) or (len(emob_demand_xr) != len(network_charges_xr)) :
+    print("Warning: timeseries do not have equal length")
 
 
 
@@ -80,11 +80,11 @@ if len(emob_demand_xr) != len(spot_prices_xr) or len(emob_demand_xr) != len(netw
 parameters_opti = {
     "settings_setup": "prosumage", # "only_EV", # "prosumage"
     "prices": "spot", # "spot", "mean"
-    "settings_obj_fnct": "scheduled_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "Q2",
-    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,10),
+    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,4),
     "tso_subset" : range(4,5),
     }
 
@@ -118,7 +118,7 @@ time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].inde
 dso_subset = parameters_opti["dso_subset"]
 emob_subset = parameters_opti["emob_subset"]
 tso_subset = parameters_opti["tso_subset"]
-timesteps = timesteps.iloc[time_subset]
+timesteps = timesteps.loc[time_subset]
 spot_prices_xr = spot_prices_xr.isel(t=time_subset)
 network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
 emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
@@ -151,8 +151,8 @@ for chunk_dso in list_of_dso_chunks:
     if parameters_opti["rolling_window"] == "day":
         unique_days = timesteps["DateTime"].dt.date.unique()
         
-        rolling_timesteps = [range(0, 15*4)] # first day until 3 pm
-        for ct_day in unique_days[:-1]: # until second last day
+        rolling_timesteps = [range(0, 24*4)] # first day (including) 3 pm until 23:45 --> minor error as after 1st day: soc 23:45 == 0:00 2nd day, otherwise no issue due to overlapping period
+        for ct_day in unique_days[:-1]: # until second last day (since "shorter" last day is irrelevant due to no new information)
             ct_next_day = ct_day + timedelta(days=1)
             day_min_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_day) & (timesteps_from_zero["DateTime"].dt.hour == 15) & (timesteps_from_zero["DateTime"].dt.minute == 0)].index.item()
             day_max_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_next_day) & (timesteps_from_zero["DateTime"].dt.hour == 23) & (timesteps_from_zero["DateTime"].dt.minute == 45)].index.item()           
@@ -171,7 +171,7 @@ for chunk_dso in list_of_dso_chunks:
             timesteps_roll = timesteps.iloc[list(ct_rolling)]
             
             # cut off time after 15 pm of the next day for saving results, but exclude last day
-            if ct_rolling[0] < rolling_timesteps[-1][0]:
+            if ct_rolling[0] < rolling_timesteps[-1][0]: # "this start time is smaller than last day's start time"
                 timesteps_today = timesteps_roll[timesteps_roll.DateTime <= timesteps_roll.DateTime.iloc[-1] - pd.Timedelta(9, "h")]
             else:
                 timesteps_today = timesteps_roll
@@ -185,8 +185,8 @@ for chunk_dso in list_of_dso_chunks:
   
     
             if not(first_iteration):
-               parameters_model["ev_soc_init_abs"] = np.minimum(soc_ev_last , parameters_model["ev_soc_max"])
-               parameters_model["bess_soc_init_abs"] = np.minimum(soc_bess_last, parameters_model["bess_soc_max"])
+               parameters_model["ev_soc_init_abs"] = np.minimum(soc_ev_last , parameters_model["ev_soc_max"]) # numerical errors occured: soc:ev_last = ev_soc_max + 0.0000000001
+               parameters_model["bess_soc_init_abs"] = np.minimum(soc_bess_last, parameters_model["bess_soc_max"]) # numerical errors occured: soc_bess_last = bess_soc_max + 0.0000000001
             else:
                parameters_model["ev_soc_init_abs"] = parameters_model["ev_soc_init_rel"] * parameters_model["ev_soc_max"]
                parameters_model["bess_soc_init_abs"] = parameters_model["bess_soc_init_rel"] * parameters_model["bess_soc_max"]
@@ -205,19 +205,11 @@ for chunk_dso in list_of_dso_chunks:
             m = model2.model_emob_quarter_smart2(timesteps_roll, spot_prices_xr_roll, tariff_static_price, network_charges_xr_roll, emob_demand_xr_roll, emob_state_xr_roll, emob_departure_times, dict_idx_lookup_sub, irradiance_xr_roll, parameters_model, parameters_opti)
             m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
 
-            #if ct_rolling[0] == 1788:
-            #    print("Achtung")
 
             if m.termination_condition == "infeasible":
                 #label = m.computeIIS()
                 m.print_infeasibilities()
-
-            #if m["P_BUY"].solution.isel(r=1,v=1).sum() > 0:
-            #    print("Kauf")
-
-            #if m[0] == "infeasible":
-            #    raise  ValueError("Infeasible " + str(ct_rolling))
-                    
+    
             if m["SOC_MISSING"].solution.sum().item() > 0:
                 print("Slack SOC_MISSING")
                 print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
@@ -227,18 +219,37 @@ for chunk_dso in list_of_dso_chunks:
                 print(m["P_EV_NOT_HOME"].solution.sum(dim=["t","r","s"]))
 
 
+
+            # storage update
+            #if first_iteration: # first day: pass 23:45 as new soc init value --> minor error, but only one timestep
+                
+            #    soc_ev_last = m["SOC_EV"].solution.isel(t=-1)
+            #    if parameters_opti["settings_setup"] != "only_EV":
+            #        soc_bess_last = m["SOC_BESS"].solution.isel(t=-1)
+                    
+            #else: # all other days: pass 15:00 value as init for next day
+             
+            timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
+            idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==15) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
+    
+            soc_ev_last = m["SOC_EV"].solution.isel(t=idx_to_roll.counter_id)
+            if parameters_opti["settings_setup"] != "only_EV":
+                soc_bess_last = m["SOC_BESS"].solution.isel(t=idx_to_roll.counter_id)
+                    
+                    
+
             # save daily results to common data structures of whole time horizon
-            if ct_rolling[0] == 0:
+            if first_iteration:
                 result_C_OP_roll = m["C_OP"].solution
                 result_C_OP_NO_PENALTY_roll = m["C_OP_NO_PENALTY"].solution
-                result_SOC_EV_roll = m["SOC_EV"].solution
-                result_P_BUY_roll =  m["P_BUY"].solution
-                result_P_EV_NOT_HOME_roll = m["P_EV_NOT_HOME"].solution
-                result_SOC_MISSING_roll = m["SOC_MISSING"].solution
+                result_SOC_EV_roll = m["SOC_EV"].solution.isel(t=range(0,idx_to_roll.counter_id)) # slight error, as only values including 14:45 are copied ...
+                result_P_BUY_roll =  m["P_BUY"].solution.isel(t=range(0,idx_to_roll.counter_id))  # ... are also used as initial soc for next optimization, see above.
+                result_P_EV_NOT_HOME_roll = m["P_EV_NOT_HOME"].solution.isel(t=range(0,idx_to_roll.counter_id))
+                result_SOC_MISSING_roll = m["SOC_MISSING"].solution.isel(t=range(0,idx_to_roll.counter_id))
                 
                 if parameters_opti["settings_setup"] == "prosumage":
-                    result_P_PV_roll = m["P_PV"].solution
-                    result_SOC_BESS_roll = m["SOC_BESS"].solution
+                    result_P_PV_roll = m["P_PV"].solution.isel(t=range(0,idx_to_roll.counter_id))
+                    result_SOC_BESS_roll = m["SOC_BESS"].solution.isel(t=range(0,idx_to_roll.counter_id))
 
             else:
                 result_C_OP_roll = result_C_OP_roll + m["C_OP"].solution
@@ -252,11 +263,11 @@ for chunk_dso in list_of_dso_chunks:
                     result_P_PV_roll = xr.concat([result_P_PV_roll, m["P_PV"].solution.isel(t=idx_today_opti)], dim="t")
                     result_SOC_BESS_roll = xr.concat([result_SOC_BESS_roll, m["SOC_BESS"].solution.isel(t=idx_today_opti)], dim="t")
                     
-            first_iteration = False
-            soc_ev_last = m["SOC_EV"].solution.isel(t=-1)
+            # roll over soc values of subsequent first timestep
             
-            if parameters_opti["settings_setup"] != "only_EV":
-                soc_bess_last = m["SOC_BESS"].solution.isel(t=-1)
+            
+            first_iteration = False
+
             
                 
         # add dso chunks together
