@@ -243,7 +243,7 @@ ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
 ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
 
 ax_ssc.set_xlabel("Intraday price signal (IDA1) in ct/kWh \n \xa0 \n lower  ← | → higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
-ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Standard - Low  ← | → High - Standard",  fontsize=my_fontsize)
+ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Standard – Low  ← | → High – Standard",  fontsize=my_fontsize)
 
 
 # deduce regression points for 2018 - 2014
@@ -277,12 +277,12 @@ a_reg_neg_2024, residuals_neg_2024, _, _ = np.linalg.lstsq(np.vstack([x_vec_nona
 x_pos_vals = np.linspace(0, 50)
 x_neg_vals = np.linspace(-50,0)
 
-ax_ssc.plot(x_pos_vals, a_reg_pos*x_pos_vals, color="blue", linestyle="-", linewidth=2, label="2018-2024, positive values")
-ax_ssc.plot(x_neg_vals, a_reg_neg*x_neg_vals, color="lightblue", linestyle="-", linewidth=2, label="2018-2024, negative values")
-ax_ssc.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="red", linestyle="-", linewidth=2, label="2024 only, positive values")
-ax_ssc.plot(x_neg_vals, a_reg_neg_2024*x_neg_vals, color="salmon", linestyle="-", linewidth=2, label="2024 only, negative values")
+ax_ssc.plot(x_pos_vals, a_reg_pos*x_pos_vals, color="blue", linestyle="-", linewidth=2, label="2018-2024") # \n (m_pos=" + "{:.4f}".format(a_reg_pos[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg[0]) + ")"  )
+ax_ssc.plot(x_neg_vals, a_reg_neg*x_neg_vals, color="blue", linestyle="-", linewidth=2, label=None)
+ax_ssc.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="lightblue", linestyle="-", linewidth=2, label="only 2024") #" \n (m_pos=" + "{:.4f}".format(a_reg_pos_2024[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg_2024[0]) + ")"  )
+ax_ssc.plot(x_neg_vals, a_reg_neg_2024*x_neg_vals, color="lightblue", linestyle="-", linewidth=2, label=None)
 
-plt.legend(loc="lower right", title="linear regression through origin")
+plt.legend(loc="lower right", title="    linear regression \n   through origin for \nupper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
 
 
 
@@ -304,7 +304,6 @@ q4 = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0))
 ax_ssc.set_xlim(xmin=-xx, xmax=xx)
 ax_ssc.set_ylim(-yy,yy)
 
-#fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_signals.svg", format="svg")
 fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_signals.svg", format="svg")
 
 
