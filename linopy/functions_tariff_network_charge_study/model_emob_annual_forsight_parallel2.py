@@ -161,29 +161,20 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     elif parameters_opti["prices"] == "mean":
         cost_xr = np.maximum(network_charges_xr + tariff_price,0)
 
+    cons_cost = m.add_constraints(C_OP == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["r","t"])).data * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost")
     
-    cons_cost = m.add_constraints(C_OP == (cost_xr * P_BUY + (cost_xr +10) * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost")
-    
-          
     #labels = m.compute_infeasibilities()
     #m.print_infeasibilities()  
     
     # zu minimierende Zielfunktion
     if parameters_opti["settings_obj_fnct"] == "immediate_charging":
-        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 997*SOC_MISSING.sum() 
-        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
-        #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
-    
+        obj = 990 * SOC_BELOW_PREF.sum() + 9999*SOC_MISSING.sum() 
     elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        obj = 999 * SOC_BELOW_PREF.sum() + 998*P_EV_NOT_HOME.sum() + 997*SOC_MISSING.sum() + 99999*(emob_HT_xr*P_BUY).sum()
-        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
-        #cost_setup_without_penalty = m.add_constraints(C_OP_NO_PENALTY == 999 * SOC_BELOW_PREF.sum())
-    
-    
+        obj = 990 * SOC_BELOW_PREF.sum() + + 9999999*(emob_HT_xr*P_BUY).sum() +  9999*SOC_MISSING.sum() 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = (cost_xr*P_BUY +  (cost_xr +10)*P_EV_NOT_HOME).sum() +  999*SOC_MISSING.sum() 
-        cons_obj =  m.add_constraints(C_OP_NO_PENALTY == (cost_xr*P_BUY + (cost_xr +10)*P_EV_NOT_HOME).sum(dims="t"), name='cons_obj')
-        
+        obj = C_OP.sum() +  9999*SOC_MISSING.sum() 
+      
+    cons_obj =  m.add_constraints(C_OP_NO_PENALTY == C_OP.sum(dims="t"), name='cons_obj')    
 
     m.add_objective(obj)
     

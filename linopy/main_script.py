@@ -78,13 +78,13 @@ if (len(emob_demand_xr) != len(spot_prices_xr)) or (len(emob_demand_xr) != len(n
 
 
 parameters_opti = {
-    "settings_setup": "prosumage", # "only_EV", # "prosumage"
-    "prices": "spot", # "spot", "mean"
+    "settings_setup": "only_EV", # "only_EV", # "prosumage"
+    "prices": "mean", # "spot", "mean"
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "Q2",
-    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,4),
+    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,10),
     "tso_subset" : range(4,5),
     }
 
@@ -104,6 +104,7 @@ parameters_model = {
     "bess_eta_dch": 0.95, # %
     "bess_losses": 0.01, # %
     "pv_p_max": 8 # kW
+    "cost_public_charge_pole": 55 # ct/kW   # https://de.statista.com/statistik/daten/studie/882563/umfrage/strompreise-an-e-auto-ladesaeulen-nach-betreiber-in-deutschland/
     }
 
 
@@ -220,15 +221,7 @@ for chunk_dso in list_of_dso_chunks:
 
 
 
-            # storage update
-            #if first_iteration: # first day: pass 23:45 as new soc init value --> minor error, but only one timestep
-                
-            #    soc_ev_last = m["SOC_EV"].solution.isel(t=-1)
-            #    if parameters_opti["settings_setup"] != "only_EV":
-            #        soc_bess_last = m["SOC_BESS"].solution.isel(t=-1)
-                    
-            #else: # all other days: pass 15:00 value as init for next day
-             
+            # storage rolling takes place each day: pass 15:00 value as init soc for next day 
             timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
             idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==15) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
     
@@ -379,7 +372,7 @@ warnings.simplefilter(action='default', category=FutureWarning)
 
 # create new folder for results
 str_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
-folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["quarter"] + "_" + parameters_opti["settings_obj_fnct"] + "_" + parameters_opti["settings_setup"])
+folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["quarter"] + "_" + parameters_opti["prices"] + "_" + parameters_opti["settings_obj_fnct"] + "_" + parameters_opti["settings_setup"])
 os.makedirs(folder_path, exist_ok=True)
 
 result_C_OP.to_netcdf(folder_path / "C_OP.nc")

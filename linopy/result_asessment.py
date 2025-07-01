@@ -19,7 +19,7 @@ import matplotlib.cm as cm
 
 
 # read  results
-folder_name = "2025-05-22_11-09_Q2_scheduled_charging_only_EV_r50_v10"
+folder_name = "2025-06-29_23-44_Q2_mean_smart_charging_only_EV_r50_v10"
 
 
 folder_path = Path("../daten_results") / folder_name
@@ -189,7 +189,9 @@ if (False): # Total Cost for scheduled and smart charging
     immediate_spot_only_charge = folder_str + r"2025-05-21_10-24_Q2_immediate_charging_only_EV_r50_v10" + r"\\"
     scheduled_spot_only_charge = folder_str + r"2025-05-22_11-09_Q2_scheduled_charging_only_EV_r50_v10" + r"\\"
     smart_spot_only_charge = folder_str + r"2025-05-20_08-52_Q2_smart_charging_only_EV_r50_v10" + r"\\"
-
+    immediate_mean_only_charge = folder_str + r"2025-06-29_22-15_Q2_mean_immediate_charging_only_EV_r50_v10" + r"\\"
+    scheduled_mean_only_charge = folder_str + r"2025-06-29_22-47_Q2_mean_scheduled_charging_only_EV_r50_v10" + r"\\"
+    smart_mean_only_charge = folder_str + r"2025-06-29_23-44_Q2_mean_smart_charging_only_EV_r50_v10" + r"\\"
 
     # data preparation
     dso_x_ev = 500
@@ -200,37 +202,47 @@ if (False): # Total Cost for scheduled and smart charging
     smart_spot_static = xr.open_dataarray(smart_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
     smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
 
-    pd_ToU_static = pd.DataFrame({'immed.':immediate_spot_static, 'schedul.':scheduled_spot_static, 'smart':smart_spot_static})
-    pd_ToU_dynamic = pd.DataFrame({'immed.': immediate_spot_ToU, 'schedul.':scheduled_spot_ToU, 'smart':smart_spot_ToU})
+    immediate_mean_static = xr.open_dataarray(immediate_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_static = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    smart_mean_static = xr.open_dataarray(smart_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
 
+    pd_ToU_static_spot = pd.DataFrame({'immediate':immediate_spot_static, 'scheduled':scheduled_spot_static, 'smart':smart_spot_static})
+    pd_ToU_dynamic_spot = pd.DataFrame({'immediate': immediate_spot_ToU, 'scheduled':scheduled_spot_ToU, 'smart':smart_spot_ToU})
+
+    pd_ToU_static_mean = pd.DataFrame({'immediate':immediate_mean_static, 'scheduled':scheduled_mean_static, 'smart':smart_mean_static})
+    pd_ToU_dynamic_mean = pd.DataFrame({'immediate': immediate_mean_ToU, 'scheduled':scheduled_mean_ToU, 'smart':smart_mean_ToU})
 
     x = np.linspace(0, 2 * np.pi, 400)
     y = np.sin(x ** 2)
 
-    fig, axs = plt.subplots(2, 2, figsize=(6, 6))
-    fig.suptitle("Scheduled charging")
+    fig_grouped_boxplots_cost_savings, axs = plt.subplots(2, 2, figsize=(8, 6))
+    fig_grouped_boxplots_cost_savings.suptitle("Scenario: EV only")
     
-    axs[0, 0].plot(x, y)
-    axs[0, 1].plot(x, y, 'tab:orange')
-    pd_ToU_static.plot(ax = axs[1, 0],  kind="box", widths=0.7, patch_artist=True, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    pd_ToU_dynamic.plot(ax = axs[1, 1], kind="box", widths=0.7, patch_artist=True, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    # https://matplotlib.org/stable/gallery/statistics/boxplot.html
+    meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black') #firebrick
+    flierprops = dict(marker='o', markerfacecolor=(0,0,0,0.1), markersize=6, markeredgecolor=(0,0,0,1))
+    
+    pd_ToU_static_mean.plot(ax = axs[0, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_ToU_dynamic_mean.plot(ax = axs[0, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_ToU_static_spot.plot(ax = axs[1, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_ToU_dynamic_spot.plot(ax = axs[1, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
     
     axs[1, 0].set_xlabel("Static")
     axs[1, 1].set_xlabel("Dynamic")
     axs[0, 0].set_ylabel("Static")
     axs[1, 0].set_ylabel("Time of Use")
     
-    fig.supxlabel("Electricity price")
-    fig.supylabel("Network charge")
+    fig_grouped_boxplots_cost_savings.supxlabel("Electricity price")
+    fig_grouped_boxplots_cost_savings.supylabel("Network charge")
 
     for ax in axs.flat:
         ax.xaxis.grid(False)
         ax.yaxis.grid(True, linestyle="--", color="lightgray")
-    
-
-
-    
-    #fig_hm.savefig(folder_path / "heatmap_savings.svg")
+        
+    fig_grouped_boxplots_cost_savings.savefig(folder_path / "grouped_boxplot_cost.svg")
     
     
     
