@@ -19,12 +19,12 @@ import matplotlib.cm as cm
 
 
 # read  results
-folder_name = "2025-06-29_23-44_Q2_mean_smart_charging_only_EV_r50_v10"
+folder_name = "2025-06-29_23-2025-07-08_22-15_all_spot_immediate_charging_only_EV_r50_v10"
 
 
 folder_path = Path("../daten_results") / folder_name
 
-result_C_OP_NO_PENALTY_eur = xr.open_dataarray(folder_path / "C_OP_NO_PENALTY.nc")
+result_C_OP_ALL_eur = xr.open_dataarray(folder_path / "C_OP_ALL.nc")
 result_SOC_EV = xr.open_dataarray(folder_path / "SOC_EV.nc")
 result_P_BUY = xr.open_dataarray(folder_path / "P_BUY.nc")
 result_P_EV_NOT_HOME = xr.open_dataarray(folder_path / "P_EV_NOT_HOME.nc")
@@ -45,11 +45,11 @@ result_SOC_MISSING["t"] = dti
 
 if (False):  # BAR PLOT MEAN COST SAVINGS PER DSO
       
-    scenarios = result_C_OP_NO_PENALTY_eur["r"].to_pandas().to_list()
-    dso_means = {'regular network charges': result_C_OP_NO_PENALTY_eur.sel(s='reg').mean(dim=["v"]),
-                    'reduced network charges': result_C_OP_NO_PENALTY_eur.sel(s='red').mean(dim=["v"]) }
+    scenarios = result_C_OP_ALL_eur["r"].to_pandas().to_list()
+    dso_means = {'regular network charges': result_C_OP_ALL_eur.sel(s='reg').mean(dim=["v"]),
+                    'reduced network charges': result_C_OP_ALL_eur.sel(s='red').mean(dim=["v"]) }
     
-    x = np.arange(len(result_C_OP_NO_PENALTY_eur.mean(dim="v")))  # the label locations
+    x = np.arange(len(result_C_OP_ALL_eur.mean(dim="v")))  # the label locations
     width = 0.25  # the width of the bars
     colors_plot = ["#D04119", "#004c93"]
     hatch_plot = ["","//"]
@@ -66,7 +66,7 @@ if (False):  # BAR PLOT MEAN COST SAVINGS PER DSO
         ct += 1
 
     ax.set_ylabel('Procurement and Network Cost in Euro')
-    str_v = str(len(result_C_OP_NO_PENALTY_eur["v"]))
+    str_v = str(len(result_C_OP_ALL_eur["v"]))
     ax.set_title('Charging at home, averaging over ' + str_v + ' different mobility use cases')
     ax.set_xticks(x + width)
     ax.set_xticklabels(scenarios, rotation=90)
@@ -88,7 +88,7 @@ if (False): # LINKED BUY AND PRICE TIMESERIS
 
 if (False): # HEATMAP SAVINGS
     
-    savings = (result_C_OP_NO_PENALTY_eur.sel(s="reg") - result_C_OP_NO_PENALTY_eur.sel(s="red")).to_pandas()
+    savings = (result_C_OP_ALL_eur.sel(s="reg") - result_C_OP_ALL_eur.sel(s="red")).to_pandas()
     savings["row_sum"] = savings.sum(axis=1) 
     savings_sorted = savings.sort_values("row_sum", ascending=False)
     savings_sorted = savings_sorted.drop(columns=["row_sum"]).transpose()
@@ -123,8 +123,8 @@ if (False): # HEATMAP SAVINGS
 if (False): # SAVINGS DEPENDENT ON MILEAGE BEHAVIOR (SCATTER + LIN REG)
     
 
-    emob_demand_quarter = np.repeat(emob_demand_xr.sum("t").to_numpy(), result_C_OP_NO_PENALTY_eur["r"].size)
-    savings_scatter = (result_C_OP_NO_PENALTY_eur.sel(s="reg") - result_C_OP_NO_PENALTY_eur.sel(s="red") ).to_numpy().reshape([result_C_OP_NO_PENALTY_eur.sel(s="reg").size, ])
+    emob_demand_quarter = np.repeat(emob_demand_xr.sum("t").to_numpy(), result_C_OP_ALL_eur["r"].size)
+    savings_scatter = (result_C_OP_ALL_eur.sel(s="reg") - result_C_OP_ALL_eur.sel(s="red") ).to_numpy().reshape([result_C_OP_ALL_eur.sel(s="reg").size, ])
     
     savings_true = (savings_scatter != 0)
     emob_demand_quarter_pos = emob_demand_quarter[savings_true]
@@ -186,28 +186,28 @@ if (False): # Total Cost for scheduled and smart charging
     folder_str = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + r"\\"
     
     # scheduled charge EV
-    immediate_spot_only_charge = folder_str + r"2025-05-21_10-24_Q2_immediate_charging_only_EV_r50_v10" + r"\\"
-    scheduled_spot_only_charge = folder_str + r"2025-05-22_11-09_Q2_scheduled_charging_only_EV_r50_v10" + r"\\"
-    smart_spot_only_charge = folder_str + r"2025-05-20_08-52_Q2_smart_charging_only_EV_r50_v10" + r"\\"
-    immediate_mean_only_charge = folder_str + r"2025-06-29_22-15_Q2_mean_immediate_charging_only_EV_r50_v10" + r"\\"
-    scheduled_mean_only_charge = folder_str + r"2025-06-29_22-47_Q2_mean_scheduled_charging_only_EV_r50_v10" + r"\\"
-    smart_mean_only_charge = folder_str + r"2025-06-29_23-44_Q2_mean_smart_charging_only_EV_r50_v10" + r"\\"
+    immediate_spot_only_charge = folder_str + r"2025-07-08_22-15_all_spot_immediate_charging_only_EV_r50_v10" + r"\\"
+    scheduled_spot_only_charge = folder_str + r"2025-07-09_08-22_all_spot_scheduled_charging_only_EV_r50_v10" + r"\\"
+    smart_spot_only_charge = folder_str + r"2025-07-09_10-59_all_spot_smart_charging_only_EV_r50_v10" + r"\\"
+    immediate_mean_only_charge = folder_str + r"2025-07-08_17-57_all_mean_immediate_charging_only_EV_r50_v10" + r"\\"
+    scheduled_mean_only_charge = folder_str + r"2025-07-08_14-39_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\"
+    smart_mean_only_charge = folder_str + r"2025-07-08_11-24_all_mean_smart_charging_only_EV_r50_v10" + r"\\"
 
     # data preparation
     dso_x_ev = 500
-    immediate_spot_static = xr.open_dataarray(immediate_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    immediate_spot_ToU = xr.open_dataarray(immediate_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    scheduled_spot_static = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    smart_spot_static = xr.open_dataarray(smart_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    immediate_spot_static = xr.open_dataarray(immediate_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    immediate_spot_ToU = xr.open_dataarray(immediate_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    scheduled_spot_static = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    smart_spot_static = xr.open_dataarray(smart_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
 
-    immediate_mean_static = xr.open_dataarray(immediate_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    scheduled_mean_static = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    smart_mean_static = xr.open_dataarray(smart_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "C_OP_NO_PENALTY.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    immediate_mean_static = xr.open_dataarray(immediate_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_static = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    smart_mean_static = xr.open_dataarray(smart_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
 
     pd_ToU_static_spot = pd.DataFrame({'immediate':immediate_spot_static, 'scheduled':scheduled_spot_static, 'smart':smart_spot_static})
     pd_ToU_dynamic_spot = pd.DataFrame({'immediate': immediate_spot_ToU, 'scheduled':scheduled_spot_ToU, 'smart':smart_spot_ToU})
@@ -272,7 +272,7 @@ if (False): # PRICE COMPARISON
     daily_mean_spot_price = signal_spot_15_15.mean(axis=1)
     rel_signal_spot_15_15 = signal_spot_15_15.sub(daily_mean_spot_price, axis=0)
     
-    # netwrork charges
+    # networrk charges
     network_charge_reduction = (network_charges_xr.sel(s="red")-network_charges_xr.sel(s="reg")).to_pandas()
     network_charge_reduction["Date"] = signal.index.strftime("%Y-%m-%d")
     network_charge_reduction["Time"] = signal.index.strftime("%H_%M")
@@ -311,76 +311,168 @@ if (False): # PRICE COMPARISON
 
 
     
-if (False): # CHARGE POWER 
-
-
-    def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H=".", **kwargs):
-        """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
-    labels is a list of the names of the dataframe, used for the legend
-    title is a string for the title of the plot
-    H is the hatch used for identification of the different dataframe"""
-        import matplotlib as mpl
-        from cycler import cycler
-        mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#efe4bf", "#004c93"])
+# =============================================================================
+# if (False): # CHARGE POWER 
+# 
+# 
+#     def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H=".", **kwargs):
+#         """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
+#     labels is a list of the names of the dataframe, used for the legend
+#     title is a string for the title of the plot
+#     H is the hatch used for identification of the different dataframe"""
+#         import matplotlib as mpl
+#         from cycler import cycler
+#         mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#efe4bf", "#004c93"])
+#     
+#         n_df = len(dfall)
+#         n_col = len(dfall[0].columns) 
+#         n_ind = len(dfall[0].index)
+#         axe = plt.subplot(111)
+#         plt.subplots_adjust(bottom=0.476,left=0.057,right=0.917,top=0.9)
+#         
+#         for df in dfall : # for each data frame
+#             axe = df.plot(kind="bar",
+#                           edgecolor="black",
+#                           linewidth=1,
+#                           stacked=True,
+#                           ax=axe,
+#                           legend=False,
+#                           grid=False,
+#                           **kwargs)  # make bar plots
+#     
+#         h,l = axe.get_legend_handles_labels() # get the handles we want to modify
+#         for i in range(0, n_df * n_col, n_col): # len(h) = n_col * n_df
+#             for j, pa in enumerate(h[i:i+n_col]):
+#                 for rect in pa.patches: # for each index
+#                     rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
+#                     #rect.set_color(colors_plot[j,int(np.floor(i/n_df))])
+#                     #print(int(i / n_col))
+#                     rect.set_hatch(H * int(i / n_col)) #edited part     
+#                     rect.set_width(1 / float(n_df + 1))
+#                     #print(int(np.floor(i/n_df)),j)
+#     
+#         axe.set_xticks((np.arange(0, 2 * n_ind, 2) + 1 / float(n_df + 1)) / 2.)
+#         axe.set_xticklabels(df.index, rotation = 90)
+#         axe.set_title(title)
+#     
+#         # Add invisible data to add another legend
+#         n=[]        
+#         for i in range(n_df):
+#             n.append(axe.bar(0, 0, color="#eeeeee", hatch=H * i))
+#     
+#         l1 = axe.legend(h[:n_col], l[:n_col], loc="upper left", ncol=2) #[1.01, 0.5]
+#         if labels is not None:
+#             l2 = plt.legend(n, labels,  loc="upper right", ncol=2) # loc=[1.01, 0.1],
+#         axe.add_artist(l1)
+#         
+#         # background grid lines
+#         axe.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
+#         axe.set_axisbelow(True)
+#         axe.set_ylim([0, 1.3*max(df_reg.max().max(), df_red.max().max())])
+#         #axe.subplots_adjust(bottom=0.2)
+#         return axe
+# 
+#     
+#     df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum("t").mean("v")}, index=result_P_BUY["r"] )
+#     df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum("t").mean("v")}, index=result_P_BUY["r"] )
+# 
+#     plot_clustered_stacked([df_reg, df_red],["regular network charges", "reduced network charges"], title="Energy consumed in kWh")
+# 
+#     fig.savefig(folder_path / "dso_energy_barlot.svg")
+# =============================================================================
     
-        n_df = len(dfall)
-        n_col = len(dfall[0].columns) 
-        n_ind = len(dfall[0].index)
-        axe = plt.subplot(111)
-        plt.subplots_adjust(bottom=0.476,left=0.057,right=0.917,top=0.9)
+    
+if (False): # Peak reduction
+
+    folder_str = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + r"\\"
         
-        for df in dfall : # for each data frame
-            axe = df.plot(kind="bar",
-                          edgecolor="black",
-                          linewidth=1,
-                          stacked=True,
-                          ax=axe,
-                          legend=False,
-                          grid=False,
-                          **kwargs)  # make bar plots
+    # files: immediate, scheduled, smart
+    spot_only_charge_list = [folder_str + x for x in [r"2025-07-08_22-15_all_spot_immediate_charging_only_EV_r50_v10" + r"\\",
+                                                r"2025-07-09_08-22_all_spot_scheduled_charging_only_EV_r50_v10" + r"\\",
+                                                r"2025-07-09_10-59_all_spot_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
+                                     
+    mean_only_charge_list = [folder_str + x for x in [r"2025-07-08_17-57_all_mean_immediate_charging_only_EV_r50_v10" + r"\\",
+                                                              r"2025-07-08_14-39_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\",
+                                                              r"2025-07-08_11-24_all_mean_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
+
+    title_list = ["immediate", "scheduled", "smart"]
     
-        h,l = axe.get_legend_handles_labels() # get the handles we want to modify
-        for i in range(0, n_df * n_col, n_col): # len(h) = n_col * n_df
-            for j, pa in enumerate(h[i:i+n_col]):
-                for rect in pa.patches: # for each index
-                    rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
-                    #rect.set_color(colors_plot[j,int(np.floor(i/n_df))])
-                    #print(int(i / n_col))
-                    rect.set_hatch(H * int(i / n_col)) #edited part     
-                    rect.set_width(1 / float(n_df + 1))
-                    #print(int(np.floor(i/n_df)),j)
-    
-        axe.set_xticks((np.arange(0, 2 * n_ind, 2) + 1 / float(n_df + 1)) / 2.)
-        axe.set_xticklabels(df.index, rotation = 90)
-        axe.set_title(title)
-    
-        # Add invisible data to add another legend
-        n=[]        
-        for i in range(n_df):
-            n.append(axe.bar(0, 0, color="#eeeeee", hatch=H * i))
-    
-        l1 = axe.legend(h[:n_col], l[:n_col], loc="upper left", ncol=2) #[1.01, 0.5]
-        if labels is not None:
-            l2 = plt.legend(n, labels,  loc="upper right", ncol=2) # loc=[1.01, 0.1],
-        axe.add_artist(l1)
+    fig_kW_reduction, axs_kW_reduction = plt.subplots(ncols=3, figsize=(15, 4))  # 3 subplots horizontally  
+    y_min, y_max = -0.01, 0.03
+
+    delta_list = []
+    delta_day_list = []
+                               
+    for ct in range(0, len(mean_only_charge_list)):
+        spot_only_charge = spot_only_charge_list[ct]
+        mean_only_charge = mean_only_charge_list[ct]
+
+        # data preparation
+        spot_static = xr.open_dataarray(spot_only_charge + "P_BUY.nc").sel(s="reg").mean("r").mean("v").to_pandas()
+        spot_ToU = xr.open_dataarray(spot_only_charge + "P_BUY.nc").sel(s="red").mean("r").mean("v").to_pandas()
+        mean_static = xr.open_dataarray(mean_only_charge + "P_BUY.nc").sel(s="reg").mean("r").mean("v").to_pandas()
+        mean_ToU = xr.open_dataarray(mean_only_charge + "P_BUY.nc").sel(s="red").mean("r").mean("v").to_pandas()
+            
+        spot_static_away = xr.open_dataarray(spot_only_charge + "P_EV_NOT_HOME.nc").mean("r").mean("v").to_pandas()
+        #spot_ToU_away = xr.open_dataarray(spot_only_charge + "P_EV_NOT_HOME.nc").mean("r").mean("v").to_pandas()
+        #mean_static_away = xr.open_dataarray(mean_only_charge + "P_EV_NOT_HOME.nc").mean("r").mean("v").to_pandas()
+        #mean_ToU_away = xr.open_dataarray(mean_only_charge + "P_EV_NOT_HOME.nc").mean("r").mean("v").to_pandas()
         
-        # background grid lines
-        axe.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
-        axe.set_axisbelow(True)
-        axe.set_ylim([0, 1.3*max(df_reg.max().max(), df_red.max().max())])
-        #axe.subplots_adjust(bottom=0.2)
-        return axe
+        # get delta timeseries
+        pd_ct = pd.concat([mean_static, mean_ToU, spot_static, spot_ToU],axis=1).rename(columns={0:"static_standard", 1:"static_ToU", 2:"dynamic_standard", 3:"dynamic_ToU"})
+        epoch_time = datetime(1970, 1, 1)
+        dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(spot_only_charge + "P_BUY.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+        pd_ct = pd_ct.set_index(dti)
+        pd_ct["hour decimal"] = pd_ct.index.hour + pd_ct.index.minute/60
 
-    
-    df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum("t").mean("v")}, index=result_P_BUY["r"] )
-    df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum("t").mean("v")}, index=result_P_BUY["r"] )
+        delta_day = pd_ct.groupby(["hour decimal"]).mean()
 
-    plot_clustered_stacked([df_reg, df_red],["regular network charges", "reduced network charges"], title="Energy consumed in kWh")
+        delta_list.append( pd_ct )
+        delta_day_list.append ( delta_day )
+        # reconvert seconds to datetime and groupby
+     
+        
+        linestyle_list = ['--', '-', '-', '-']  # same length as columns
+        color_list = ["#8b3003", "#c13f1a", "#00386c", "#0087ff"]
+        
+        for i, col in enumerate(delta_day.columns):
+            axs_kW_reduction[ct].plot(delta_day.index, 
+                                         delta_day[col],
+                   alpha=1,
+                   linestyle=linestyle_list[i % len(linestyle_list)],
+                   color=color_list[i % len(color_list)],
+                   label=delta_day.columns)
+        axs_kW_reduction[ct].set_title(title_list[ct])
+        axs_kW_reduction[ct].set_ylim(y_min, y_max)
+        axs_kW_reduction[ct].set_xlabel("Time in hours")
 
-    fig.savefig(folder_path / "dso_energy_barlot.svg")
-    
-    
-    
+        #axs_kW_reduction[ct].set_xticks([0, 12, 24, 36, 48, 60, 72, 84])
+        #axs_kW_reduction[ct].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21])
+
+
+    axs_kW_reduction[0].set_ylabel("Average power reduction in kW")
+    fig_kW_reduction.legend(['static standard', 'static ToU', 'dynamic standard', 'dynamic ToU'], ncol=4, loc='lower center')
+    fig_kW_reduction.tight_layout()
+    #fig_kW_reduction.subplots_adjust(right=0.85)
+    fig_kW_reduction.subplots_adjust(bottom=0.20)
+
+    plt.show()
+
+
+
+
+
+
+
+    #scheduled_spot_static = xr.open_dataarray(scheduled_spot_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #smart_spot_static = xr.open_dataarray(smart_spot_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #scheduled_mean_static = xr.open_dataarray(scheduled_mean_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #smart_mean_static = xr.open_dataarray(smart_mean_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+    #smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "P_BUY.nc").mean("r").mean("v").to_pandas()
+
 
 
 

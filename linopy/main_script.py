@@ -31,14 +31,45 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 
 
+parameters_opti = {
+    "year":2024,
+    "settings_setup": "only_EV", # "only_EV", # "prosumage"
+    "prices": "mean", # "spot", "mean"
+    "settings_obj_fnct": "immediate_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "rolling_window": "day", # "no/year", "day"
+    "quarter" : "all", # "Q1", "Q2, ...
+    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,10),
+    "tso_subset" : range(4,5),
+    }
+
+parameters_model = {
+    "ev_p_charge_home":11, # kW
+    "ev_soc_max": 70, # kWh
+    "ev_soc_init_rel": 0.9, # %
+    "ev_soc_preference": 0.95, # %
+    "ev_soc_departure": 0.95, # %
+    "ev_p_charge_not_home": 22, # kW
+    "ev_eta_in": 0.95,
+    "ev_losses": 0.0001,
+    "bess_p_max": 5, # kW
+    "bess_soc_max": 9, # kWh
+    "bess_soc_init_rel": 0.9, # %
+    "bess_eta_ch": 0.95, # %
+    "bess_eta_dch": 0.95, # %
+    "bess_losses": 0.01, # %
+    "pv_p_max": 8, # kW
+    "cost_public_charge_pole": 55 # ct/kW   # https://de.statista.com/statistik/daten/studie/882563/umfrage/strompreise-an-e-auto-ladesaeulen-nach-betreiber-in-deutschland/
+    }
+
+
 
 # get relevant timesteps to compute KW1-KW52/53
-parameter_year = 2024 
-timesteps = f_load.load_timesteps(parameter_year)
+timesteps = f_load.load_timesteps(parameters_opti["year"])
 
 # Load spot prices
 parameter_folderpath_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
-spot_prices_xr = f_load.load_spot_prices(parameter_year, parameter_folderpath_prices, "id_auktion_15_uhr", timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
+spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, "id_auktion_15_uhr", timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
 tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
@@ -46,8 +77,8 @@ parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4
 network_charges_xr = f_load.load_network_charges(parameter_filepath_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
 
 # Load e-Mobility
-parameter_folderpath_emob_demand = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_total_moving_average_neu.csv"
-parameter_folderpath_emob_state = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_total_moving_average_neu.csv"
+parameter_folderpath_emob_demand = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
+parameter_folderpath_emob_state = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
 emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0)   # CAN BE IMPROVED, ONLY FIRST SHOT
@@ -77,35 +108,6 @@ if (len(emob_demand_xr) != len(spot_prices_xr)) or (len(emob_demand_xr) != len(n
 
 
 
-parameters_opti = {
-    "settings_setup": "only_EV", # "only_EV", # "prosumage"
-    "prices": "mean", # "spot", "mean"
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
-    "rolling_window": "day", # "no/year", "day"
-    "quarter" : "Q2",
-    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,10),
-    "tso_subset" : range(4,5),
-    }
-
-parameters_model = {
-    "ev_p_charge_home":11, # kW
-    "ev_soc_max": 70, # kWh
-    "ev_soc_init_rel": 0.9, # %
-    "ev_soc_preference": 0.95, # %
-    "ev_soc_departure": 0.95, # %
-    "ev_p_charge_not_home": 22, # kW
-    "ev_eta_in": 0.95,
-    "ev_losses": 0.0001,
-    "bess_p_max": 5, # kW
-    "bess_soc_max": 9, # kWh
-    "bess_soc_init_rel": 0.9, # %
-    "bess_eta_ch": 0.95, # %
-    "bess_eta_dch": 0.95, # %
-    "bess_losses": 0.01, # %
-    "pv_p_max": 8 # kW
-    "cost_public_charge_pole": 55 # ct/kW   # https://de.statista.com/statistik/daten/studie/882563/umfrage/strompreise-an-e-auto-ladesaeulen-nach-betreiber-in-deutschland/
-    }
 
 
 length_dso_chunk = 5
@@ -115,7 +117,11 @@ list_of_dso_chunks = [lst[round(length_dso_chunk * i):round(length_dso_chunk * (
 
 
 # limit data to relevant values according to parameters mentioned above
-time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
+if parameters_opti["quarter"] != "all":
+    time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
+else:
+    time_subset = timesteps[timesteps.DateTime.dt.year==parameters_opti["year"]].index   # can be improved, load emobpy data for iso calendar, not only exact 2024
+
 dso_subset = parameters_opti["dso_subset"]
 emob_subset = parameters_opti["emob_subset"]
 tso_subset = parameters_opti["tso_subset"]
@@ -129,7 +135,6 @@ irradiance_xr = irradiance_xr.isel(t=time_subset, a=tso_subset)
 
 
 timesteps_from_zero = timesteps.reset_index()
-#_, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, -timesteps.index[0] )   # CAN BE IMPROVED, ONLY FIRST SHOT
 _, _, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0 )   # CAN BE IMPROVED, ONLY FIRST SHOT
 
 
@@ -211,9 +216,9 @@ for chunk_dso in list_of_dso_chunks:
                 #label = m.computeIIS()
                 m.print_infeasibilities()
     
-            if m["SOC_MISSING"].solution.sum().item() > 0:
-                print("Slack SOC_MISSING")
-                print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
+            #if m["SOC_MISSING"].solution.sum().item() > 0:
+            #    print("Slack SOC_MISSING")
+            #    print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
          
             if m["P_EV_NOT_HOME"].solution.sum().item() > 0:
                 print("P_EV_NOT_HOME")
@@ -222,7 +227,10 @@ for chunk_dso in list_of_dso_chunks:
 
 
             # storage rolling takes place each day: pass 15:00 value as init soc for next day 
+            pd.set_option("mode.chained_assignment", None)  
             timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
+            pd.set_option("mode.chained_assignment", "warn")    
+
             idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==15) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
     
             soc_ev_last = m["SOC_EV"].solution.isel(t=idx_to_roll.counter_id)
@@ -233,24 +241,24 @@ for chunk_dso in list_of_dso_chunks:
 
             # save daily results to common data structures of whole time horizon
             if first_iteration:
-                result_C_OP_roll = m["C_OP"].solution
-                result_C_OP_NO_PENALTY_roll = m["C_OP_NO_PENALTY"].solution
+                result_C_OP_ALL_roll = m["C_OP_ALL"].solution
+                result_C_OP_HOME_roll = m["C_OP_HOME"].solution
                 result_SOC_EV_roll = m["SOC_EV"].solution.isel(t=range(0,idx_to_roll.counter_id)) # slight error, as only values including 14:45 are copied ...
                 result_P_BUY_roll =  m["P_BUY"].solution.isel(t=range(0,idx_to_roll.counter_id))  # ... are also used as initial soc for next optimization, see above.
                 result_P_EV_NOT_HOME_roll = m["P_EV_NOT_HOME"].solution.isel(t=range(0,idx_to_roll.counter_id))
-                result_SOC_MISSING_roll = m["SOC_MISSING"].solution.isel(t=range(0,idx_to_roll.counter_id))
+                #result_SOC_MISSING_roll = m["SOC_MISSING"].solution.isel(t=range(0,idx_to_roll.counter_id))
                 
                 if parameters_opti["settings_setup"] == "prosumage":
                     result_P_PV_roll = m["P_PV"].solution.isel(t=range(0,idx_to_roll.counter_id))
                     result_SOC_BESS_roll = m["SOC_BESS"].solution.isel(t=range(0,idx_to_roll.counter_id))
 
             else:
-                result_C_OP_roll = result_C_OP_roll + m["C_OP"].solution
-                result_C_OP_NO_PENALTY_roll = result_C_OP_NO_PENALTY_roll + m["C_OP_NO_PENALTY"].solution
+                result_C_OP_ALL_roll = result_C_OP_ALL_roll + m["C_OP_ALL"].solution
+                result_C_OP_HOME_roll = result_C_OP_HOME_roll + m["C_OP_HOME"].solution
                 result_SOC_EV_roll = xr.concat([result_SOC_EV_roll, m["SOC_EV"].solution.isel(t=idx_today_opti)], dim="t")
                 result_P_BUY_roll = xr.concat([result_P_BUY_roll, m["P_BUY"].solution.isel(t=idx_today_opti)], dim="t")
                 result_P_EV_NOT_HOME_roll = xr.concat([result_P_EV_NOT_HOME_roll, m["P_EV_NOT_HOME"].solution.isel(t=idx_today_opti)], dim="t")
-                result_SOC_MISSING_roll = xr.concat([result_SOC_MISSING_roll, m["SOC_MISSING"].solution.isel(t=idx_today_opti)], dim="t")
+                #result_SOC_MISSING_roll = xr.concat([result_SOC_MISSING_roll, m["SOC_MISSING"].solution.isel(t=idx_today_opti)], dim="t")
                 
                 if parameters_opti["settings_setup"] == "prosumage":
                     result_P_PV_roll = xr.concat([result_P_PV_roll, m["P_PV"].solution.isel(t=idx_today_opti)], dim="t")
@@ -265,24 +273,24 @@ for chunk_dso in list_of_dso_chunks:
                 
         # add dso chunks together
         if chunk_dso[0] == 0:
-            result_C_OP = result_C_OP_roll
-            result_C_OP_NO_PENALTY = result_C_OP_NO_PENALTY_roll
+            result_C_OP_ALL = result_C_OP_ALL_roll
+            result_C_OP_HOME = result_C_OP_HOME_roll
             result_SOC_EV = result_SOC_EV_roll
             result_P_BUY =  result_P_BUY_roll
             result_P_EV_NOT_HOME = result_P_EV_NOT_HOME_roll
-            result_SOC_MISSING = result_SOC_MISSING_roll
+            #result_SOC_MISSING = result_SOC_MISSING_roll
             
             if parameters_opti["settings_setup"] == "prosumage":
                 result_P_PV = result_P_PV_roll
                 result_SOC_BESS = result_SOC_BESS_roll
                 
         else:
-            result_C_OP = xr.concat([result_C_OP, result_C_OP_roll], dim="r")
-            result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, result_C_OP_NO_PENALTY_roll], dim="r")
+            result_C_OP_ALL = xr.concat([result_C_OP_ALL, result_C_OP_ALL_roll], dim="r")
+            result_C_OP_HOME = xr.concat([result_C_OP_HOME, result_C_OP_HOME_roll], dim="r")
             result_SOC_EV = xr.concat([result_SOC_EV, result_SOC_EV_roll], dim="r")
             result_P_BUY = xr.concat([result_P_BUY, result_P_BUY_roll], dim="r")
             result_P_EV_NOT_HOME = xr.concat([result_P_BUY, result_P_EV_NOT_HOME_roll], dim="r")
-            result_SOC_MISSING = xr.concat([result_SOC_MISSING, result_SOC_MISSING_roll], dim="r")
+            #result_SOC_MISSING = xr.concat([result_SOC_MISSING, result_SOC_MISSING_roll], dim="r")
 
             
             if parameters_opti["settings_setup"] == "prosumage":
@@ -301,9 +309,9 @@ for chunk_dso in list_of_dso_chunks:
     
 
         # display infeasibility variables if applicable
-        if m["SOC_MISSING"].solution.sum().item() > 0:
-            print("Slack SOC_MISSING")
-            print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
+        #if m["SOC_MISSING"].solution.sum().item() > 0:
+        #    print("Slack SOC_MISSING")
+        #    print(m["SOC_MISSING"].solution.sum(dim=["t","r","s"]))
     
         if m["P_EV_NOT_HOME"].solution.sum().item() > 0:
             print("P_EV_NOT_HOME")
@@ -312,24 +320,24 @@ for chunk_dso in list_of_dso_chunks:
 
         #  store total time horizon results in large dataset with all dsos 
         if chunk_dso[0] == 0:
-            result_C_OP = m["C_OP"].solution
-            result_C_OP_NO_PENALTY = m["C_OP_NO_PENALTY"].solution
+            result_C_OP_ALL = m["C_OP_ALL"].solution
+            result_C_OP_HOME = m["C_OP_HOME"].solution
             result_SOC_EV = m["SOC_EV"].solution
             result_P_BUY =  m["P_BUY"].solution
             result_P_EV_NOT_HOME = m["P_EV_NOT_HOME"].solution
-            result_SOC_MISSING = m["SOC_MISSING"].solution
+            #result_SOC_MISSING = m["SOC_MISSING"].solution
             
             if parameters_opti["settings_setup"] == "prosumage":
                 result_P_PV = m["P_PV"].solution
                 result_SOC_BESS = m["SOC_BESS"].solution
                 
         else:
-            result_C_OP = xr.concat([result_C_OP, m["C_OP"].solution], dim="r")
-            result_C_OP_NO_PENALTY = xr.concat([result_C_OP_NO_PENALTY, m["C_OP_NO_PENALTY"].solution], dim="r")
+            result_C_OP_ALL = xr.concat([result_C_OP_ALL, m["C_OP_ALL"].solution], dim="r")
+            result_C_OP_HOME = xr.concat([result_C_OP_HOME, m["C_OP_HOME"].solution], dim="r")
             result_SOC_EV = xr.concat([result_SOC_EV, m["SOC_EV"].solution], dim="r")
             result_P_BUY = xr.concat([result_P_BUY, m["P_BUY"].solution], dim="r")
             result_P_EV_NOT_HOME = xr.concat([result_P_EV_NOT_HOME, m["P_EV_NOT_HOME"].solution], dim="r")
-            result_SOC_MISSING = xr.concat([result_SOC_MISSING, m["SOC_MISSING"].solution], dim="r")
+            #result_SOC_MISSING = xr.concat([result_SOC_MISSING, m["SOC_MISSING"].solution], dim="r")
     
             
             if parameters_opti["settings_setup"] == "prosumage":
@@ -349,19 +357,24 @@ if (False):
 #  ==== END OF LOOP =====
 
 # unit conversion
-result_C_OP_eur = result_C_OP/100 # ct --> eur
-result_C_OP_NO_PENALTY_eur = result_C_OP_NO_PENALTY/100 # ct --> eur
+result_C_OP_ALL_eur = result_C_OP_ALL/100 # ct --> eur
+result_C_OP_HOME_eur = result_C_OP_HOME/100 # ct --> eur
 
 # convert int64 of datetime object to seconds to be able to save netcdf
-idx_time = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
+
+if parameters_opti["quarter"] != "all":
+    idx_time = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
+else:
+    idx_time = timesteps[timesteps.DateTime.dt.year==parameters_opti["year"]].index   # can be improved, load emobpy data for iso calendar, not only exact 2024
+
 result_P_BUY_1970 = result_P_BUY
 result_P_BUY_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
 result_SOC_EV_1970 = result_SOC_EV
 result_SOC_EV_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]
 result_P_EV_NOT_HOME_1970 = result_P_EV_NOT_HOME
 result_P_EV_NOT_HOME_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"] 
-result_SOC_MISSING_1970 = result_SOC_MISSING
-result_SOC_MISSING_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]  
+#result_SOC_MISSING_1970 = result_SOC_MISSING
+#result_SOC_MISSING_1970["t"] = timesteps.loc[idx_time,"seconds_since_1970_in_utc"]  
 
 warnings.simplefilter(action='default', category=FutureWarning)      
 
@@ -375,12 +388,12 @@ str_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["quarter"] + "_" + parameters_opti["prices"] + "_" + parameters_opti["settings_obj_fnct"] + "_" + parameters_opti["settings_setup"])
 os.makedirs(folder_path, exist_ok=True)
 
-result_C_OP.to_netcdf(folder_path / "C_OP.nc")
-result_C_OP_NO_PENALTY_eur.to_netcdf(folder_path / "C_OP_NO_PENALTY.nc")
+result_C_OP_ALL_eur.to_netcdf(folder_path / "C_OP_ALL.nc")
+result_C_OP_HOME_eur.to_netcdf(folder_path / "C_OP_HOME.nc")
 result_SOC_EV_1970.to_netcdf(folder_path / "SOC_EV.nc")
 result_P_BUY_1970.to_netcdf(folder_path / "P_BUY.nc")
 result_P_EV_NOT_HOME_1970.to_netcdf(folder_path / "P_EV_NOT_HOME.nc")
-result_SOC_MISSING_1970.to_netcdf(folder_path / "SOC_MISSING.nc")
+#result_SOC_MISSING_1970.to_netcdf(folder_path / "SOC_MISSING.nc")
 
 with open(folder_path / "parameters_opti.txt", 'w') as f:
     f.write(pd.DataFrame.from_dict(parameters_opti, orient='index').to_string(header=False, index=True))

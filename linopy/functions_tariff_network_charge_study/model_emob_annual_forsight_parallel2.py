@@ -71,9 +71,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     # =========== VARIABLES ===============
     
     #OBJ_WITHOUT_PENALTIES = m.add_variables(name='OBJ_WITHOUT_PENALTIES')
-    C_OP = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name='C_OP')
-
-    C_OP_NO_PENALTY = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name="C_OP_NO_PENALTY")
+    C_OP_ALL = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name='C_OP_ALL')
+    C_OP_HOME = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name="C_OP_HOME")
 
     # EV Battery
     SOC_EV = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='SOC_EV', lower=0) # EV battery state of charge
@@ -91,7 +90,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
     SOC_BELOW_PREF = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='E_BELOW_PREF', lower=0) # EV Mobility
     P_EV_NOT_HOME = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='P_EV_NOT_HOME', lower=0) # EV charge power
-    SOC_MISSING = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='SOC_MISSING', lower=0) # EV charge power
+    #SOC_MISSING = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='SOC_MISSING', lower=0) # EV charge power
 
 
 
@@ -105,7 +104,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     #cons_ev_update_last_fix = m.add_constraints(P_EV.isel(t=len(set_time)-1) == 0, name='cons_ev_update_last_fix')
     cons_ev_max_soc = m.add_constraints(SOC_EV <= parameters["ev_soc_max"], name='cons_ev_max_soc')
     cons_ev_charge_ev_max = m.add_constraints(P_EV <= emob_home_xr * parameters["ev_p_charge_home"], name='cons_ev_charge_home')
-    cons_ev_charge_not_home = m.add_constraints(P_EV + P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_ev_charge_not_home')
+    cons_ev_charge_not_home = m.add_constraints(P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_ev_charge_not_home')
 
     cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == parameters["ev_soc_init_abs"], name='cons_ev_init')
 
@@ -113,7 +112,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     # dedicated filling level when person usually departs from home
     for ct_ev in set_vehicle.astype(int):
         t_ev = dict_idx_lookup[emob_departure_times[ct_ev]]
-        con_ct_pref_ev = m.add_constraints( SOC_EV.isel(v=ct_ev, t=dict_idx_lookup[emob_departure_times[ct_ev]]) - SOC_MISSING.isel(v=ct_ev, t=t_ev) >= parameters["ev_soc_departure"] * parameters["ev_soc_max"], name='cons_ct_pref_ev_'+str(ct_ev))
+        #con_ct_pref_ev = m.add_constraints( SOC_EV.isel(v=ct_ev, t=dict_idx_lookup[emob_departure_times[ct_ev]]) - SOC_MISSING.isel(v=ct_ev, t=t_ev) >= parameters["ev_soc_departure"] * parameters["ev_soc_max"], name='cons_ct_pref_ev_'+str(ct_ev))
+        con_ct_pref_ev = m.add_constraints( SOC_EV.isel(v=ct_ev, t=dict_idx_lookup[emob_departure_times[ct_ev]]) >= parameters["ev_soc_departure"] * parameters["ev_soc_max"], name='cons_ct_pref_ev_'+str(ct_ev))
 
 
 
@@ -161,21 +161,21 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     elif parameters_opti["prices"] == "mean":
         cost_xr = np.maximum(network_charges_xr + tariff_price,0)
 
-    cons_cost = m.add_constraints(C_OP == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["r","t"])).data * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost")
+    cons_cost_all = m.add_constraints(C_OP_ALL == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["r","t"])).item() * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost_all")
+    cons_cost_home = m.add_constraints(C_OP_HOME == (cost_xr * P_BUY).sum(dims="t"), name="cons_cost_home")
+
     
     #labels = m.compute_infeasibilities()
     #m.print_infeasibilities()  
     
     # zu minimierende Zielfunktion
     if parameters_opti["settings_obj_fnct"] == "immediate_charging":
-        obj = 990 * SOC_BELOW_PREF.sum() + 9999*SOC_MISSING.sum() 
+        obj = 99 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum() 
     elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        obj = 990 * SOC_BELOW_PREF.sum() + + 9999999*(emob_HT_xr*P_BUY).sum() +  9999*SOC_MISSING.sum() 
+        obj = 99 * SOC_BELOW_PREF.sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum() #+ 999*SOC_MISSING.sum() 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = C_OP.sum() +  9999*SOC_MISSING.sum() 
+        obj = C_OP_ALL.sum() +   999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum()
       
-    cons_obj =  m.add_constraints(C_OP_NO_PENALTY == C_OP.sum(dims="t"), name='cons_obj')    
-
     m.add_objective(obj)
     
     warnings.simplefilter(action='default', category=FutureWarning)
