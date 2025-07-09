@@ -53,7 +53,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     #irradiance_xr = irradiance_xr.isel(t=ct_rolling)
 
     emob_home_xr = (emob_state_xr=="home")
-    emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean()).drop_vars("s")
+    emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean(dim="t")).drop_vars("s")
     
     
 
@@ -174,7 +174,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
         obj = 99 * SOC_BELOW_PREF.sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum() #+ 999*SOC_MISSING.sum() 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = C_OP_ALL.sum() +   999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum()
+        obj = C_OP_ALL.sum() #+   999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum()
       
     m.add_objective(obj)
     

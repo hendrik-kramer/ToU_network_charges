@@ -35,7 +35,7 @@ parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "prices": "mean", # "spot", "mean"
-    "settings_obj_fnct": "immediate_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
     "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
