@@ -43,10 +43,38 @@ def load_timesteps(input_year):
 def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
 
     # read in time data 
-    if str_auction == "da_auktion_12_uhr":
+    if str_auction == "da_auction_hourly_12_uhr":
+        raw_price_data = pd.read_csv(input_folderpath + "da_auktion_12_uhr_hourly\energy-charts_DAM_hourly_" + str(input_year) + "_mit_Raendern.csv", skiprows=1)
+        raw_price_data = raw_price_data.rename(columns={"Unnamed: 0":"Time_utc", "Preis (EUR/MWh, EUR/tCO2)":"Value"})
+        raw_price_data["Time_utc"] = pd.to_datetime(raw_price_data['Time_utc'], utc=True)
+
+        # interpolate hourly data to quarter data
+        resample_method = "stairs" # "stairs", "linear"
+        if resample_method == "stairs":
+            raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().fillna(method='ffill')
+        else:
+            raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().shift(2).interpolate(method="linear")  # shift value to half hour value
+                
+        raw_price_data['Time_DE'] = raw_price_data.index.tz_convert('Europe/Berlin')
+        raw_price_data['iso_year'] = raw_price_data['Time_DE'].dt.isocalendar().year
+        raw_price_data['iso_week'] = raw_price_data['Time_DE'].dt.isocalendar().week
+        raw_price_data["Value"] = raw_price_data["Value"]/10 # €/MWh --> ct/kWh
+    
+        price_data = raw_price_data[(raw_price_data['iso_year']==input_year)]
+        price_data.loc[:,"DateTime"] = pd.to_datetime(price_data["Time_DE"])
+        
+        price_data["Quarter"] = "Q" + np.ceil(pd.to_datetime(price_data["DateTime"]).dt.month/3).astype(int).astype(str)
+        price_data = price_data.rename(columns={"Value":"spot_cost"})
+        price_data["Time_String"] = pd.to_datetime(price_data["DateTime"]).dt.tz_localize(None).dt.strftime("%H:%M:%S").astype(str)
+            
+        price_data = price_data.rename(columns={"DateTime":"t"}).set_index("t", drop=True)
+        price_data_xr = xr.DataArray(price_data["spot_cost"])
+        prices_xr = price_data_xr.astype(float)
+    
+    elif str_auction == "da_auction_quarterly_12_uhr":
         
         #print("load 12h auction data")
-        raw_price_data = pd.read_csv(input_folderpath + "da_auktion_12_uhr\DayAheadPrices_12_1_D_2019_2024_hourly_quarterly.csv")
+        raw_price_data = pd.read_csv(input_folderpath + "da_auktion_12_uhr_quarterly\DayAheadPrices_12_1_D_2019_2024_hourly_quarterly.csv")
         #print(raw_price_data)
         # convert utc time to local time
         raw_price_data['Time_utc'] = pd.to_datetime(raw_price_data['DateTime'], format='%Y-%m-%d %H:%M:%S', utc=True)

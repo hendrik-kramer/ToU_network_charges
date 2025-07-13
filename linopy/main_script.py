@@ -34,12 +34,13 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
-    "prices": "mean", # "spot", "mean"
+    "auction": "da_auction_hourly_12_uhr",  # "da_auction_hourly_12_uhr", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
+    "prices": "spot", # "spot", "mean"
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
-    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,10),
+    "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,50),
     "tso_subset" : range(4,5),
     }
 
@@ -69,7 +70,7 @@ timesteps = f_load.load_timesteps(parameters_opti["year"])
 
 # Load spot prices
 parameter_folderpath_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
-spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, "id_auktion_15_uhr", timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
+spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, parameters_opti["auction"], timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
 tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
