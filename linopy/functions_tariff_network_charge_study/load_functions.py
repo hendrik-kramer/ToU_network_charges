@@ -159,8 +159,7 @@ def load_network_charges(input_filepath, timesteps):
     network_levels_HSN = network_charges_hours.set_index("Netzbetreiber").rename_axis(None).iloc[:,0:96]
     network_levels_S = network_levels_HSN.replace("H","S").replace("N","S")
     array_quarters = network_charges_hours.set_index("Netzbetreiber").rename_axis(None).iloc[:,96:101].transpose()
-    
-    
+      
     HSN_table_stacked = pd.DataFrame() # create empty pd
     quarter_title = ["Q1","Q2","Q3","Q4"]
     
@@ -220,7 +219,23 @@ def load_network_charges(input_filepath, timesteps):
     network_charges_xr = xr.concat([xr.DataArray(network_charges_reg_year, dims=['t','r']).expand_dims("s",axis=2), xr.DataArray(network_charges_red_year, dims=['t','r']).expand_dims("s",axis=2)], dim="s")
     network_charges_xr['s'] = ['reg', 'red']
     
-    return network_charges_xr.astype(float)
+    
+    
+    # prepare secondary outpu no 1: amount of active quarters
+    array_quarters_sum = array_quarters.loc[["Q1", "Q2", "Q3", "Q4"],:].transpose().sum(axis=1)
+    xr_dso_quarters_sum = xr.DataArray(array_quarters_sum, dims="r")
+    
+    # prepare secondary output n0 2: ht length
+    network_levels_H = (network_levels_HSN == "H").sum(axis=1)/4
+    xr_ht_length = xr.DataArray(network_levels_H , dims="r" )
+    
+    # prepare secondary output no 3: ht/st price factor
+    xr_ht_div_st_fraction = xr.DataArray( charges_HSN.loc["H",:] / charges_HSN.loc["S",:] , dims="r")
+    
+    
+    
+    
+    return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_ht_div_st_fraction
 
 
 def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
