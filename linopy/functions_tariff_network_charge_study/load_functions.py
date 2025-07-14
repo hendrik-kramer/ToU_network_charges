@@ -43,14 +43,14 @@ def load_timesteps(input_year):
 def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
 
     # read in time data 
-    if str_auction == "da_auction_hourly_12_uhr":
+    if "da_auction_hourly_12_uhr" in str_auction:
         raw_price_data = pd.read_csv(input_folderpath + "da_auktion_12_uhr_hourly\energy-charts_DAM_hourly_" + str(input_year) + "_mit_Raendern.csv", skiprows=1)
         raw_price_data = raw_price_data.rename(columns={"Unnamed: 0":"Time_utc", "Preis (EUR/MWh, EUR/tCO2)":"Value"})
         raw_price_data["Time_utc"] = pd.to_datetime(raw_price_data['Time_utc'], utc=True)
 
         # interpolate hourly data to quarter data
-        resample_method = "stairs" # "stairs", "linear"
-        if resample_method == "stairs":
+        resample_method = "interpolate" # "stairs", "linear"
+        if "stairs" in str_auction:
             raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().fillna(method='ffill')
         else:
             raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().shift(2).interpolate(method="linear")  # shift value to half hour value

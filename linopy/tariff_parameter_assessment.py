@@ -41,9 +41,12 @@ result_P_BUY_new_dynamic = xr.open_dataarray(folder_path + file_new_dynamic + "P
 
 # reconvert seconds to datetime
 epoch_time = datetime(1970, 1, 1)
-dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_P_BUY_old["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
-result_P_BUY_old["t"] = dti
-result_P_BUY_new["t"] = dti
+dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_P_BUY_old_static["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+result_P_BUY_old_static["t"] = dti
+result_P_BUY_new_static["t"] = dti
+result_P_BUY_old_dynamic["t"] = dti
+result_P_BUY_new_dynamic["t"] = dti
+
 
 result_P_BUY_old_static = result_P_BUY_old_static.sel(s="reg")
 result_P_BUY_new_static = result_P_BUY_new_static.sel(s="reg")
@@ -103,11 +106,11 @@ average_kWh_neg_kwh_in_ht_per_day_dynamic = ((P_delta_neg_dynamic * emob_HT_xr).
 
 
 ht_kwh_shifted_vector_mean_static = np.array(average_kWh_neg_kwh_in_ht_per_day_static).reshape(-1,)
-ht_kwh_shifted_vector_mean_dynamic.array(average_kWh_neg_kwh_in_ht_per_day_dynamic).reshape(-1,)
+ht_kwh_shifted_vector_mean_dynamic = np.array(average_kWh_neg_kwh_in_ht_per_day_dynamic).reshape(-1,)
 
 
-ht_length_vector =  np.repeat(xr_ht_length.to_numpy(), len(average_kWh_neg_kwh_in_ht_per_day.columns))
-ht_price_factor_vector =  np.repeat((xr_ht_charge / xr_st_charge).to_numpy(), len(average_kWh_neg_kwh_in_ht_per_day.columns))
+ht_length_vector =  np.repeat(xr_ht_length.to_numpy(), len(average_kWh_neg_kwh_in_ht_per_day_static.columns))
+ht_price_factor_vector =  np.repeat((xr_ht_charge / xr_st_charge).to_numpy(), len(average_kWh_neg_kwh_in_ht_per_day_static.columns))
 
 
 use_mean = False

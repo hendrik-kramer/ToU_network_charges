@@ -34,7 +34,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
-    "auction": "id_auktion_15_uhr",  # "da_auction_hourly_12_uhr", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
+    "auction": "da_auction_hourly_12_uhr_linInterpol",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "prices": "spot", # "spot", "mean"
     "settings_obj_fnct": "scheduled_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"

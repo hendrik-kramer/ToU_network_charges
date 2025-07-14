@@ -120,36 +120,6 @@ if (False): # HEATMAP SAVINGS
 
 
 
-if (False): # SAVINGS DEPENDENT ON MILEAGE BEHAVIOR (SCATTER + LIN REG)
-    
-
-    emob_demand_quarter = np.repeat(emob_demand_xr.sum("t").to_numpy(), result_C_OP_ALL_eur["r"].size)
-    savings_scatter = (result_C_OP_ALL_eur.sel(s="reg") - result_C_OP_ALL_eur.sel(s="red") ).to_numpy().reshape([result_C_OP_ALL_eur.sel(s="reg").size, ])
-    
-    savings_true = (savings_scatter != 0)
-    emob_demand_quarter_pos = emob_demand_quarter[savings_true]
-    savings_scatter_pos = savings_scatter[savings_true]
-    
-    
-    fig_km, ax_km = plt.subplots(figsize=(15, 5)) 
-    scatter = ax_km.scatter(emob_demand_quarter_pos, savings_scatter_pos, alpha=0.3)
-    
-    coef = np.polyfit(emob_demand_quarter_pos,savings_scatter_pos,1)
-    poly1d_fn = np.poly1d(coef) 
-    str(poly1d_fn)
-    
-    x = np.arange(1000)
-    y = poly1d_fn(x)
-    plt.plot(x, y, linestyle="--", color="k", label=str("y = " + str(poly1d_fn) ))
-    plt.legend()
-    
-    plt.xlim([300,700])
-    plt.xlabel("Energy consumption in kWh")
-    plt.ylabel("Savings in €")
-    plt.show()
-    
-    fig_km.savefig(folder_path / "savings_per_energy_consumed_milage.svg")
-    
     
     
 if (False): # PEAK REDUCTION HEATMAP
@@ -179,7 +149,8 @@ if (False): # PEAK REDUCTION HEATMAP
     fig_kw_reduction.savefig(folder_path / "peak_reduction_savings.svg")
     
     
-if (False): # Total Cost for scheduled and smart charging
+    
+if (False): # Total Cost for scheduled and smart charging // Annual cost savings end-consumer
     
     # pfade scheduled
     # network charge _ elec
@@ -232,7 +203,7 @@ if (False): # Total Cost for scheduled and smart charging
     
     axs[1, 0].set_xlabel("Static", fontsize=20)
     axs[1, 1].set_xlabel("Dynamic", fontsize=20)
-    axs[0, 0].set_ylabel("Static", fontsize=20)
+    axs[0, 0].set_ylabel("Standard", fontsize=20)
     axs[1, 0].set_ylabel("Time of Use", fontsize=20)
     
     axs[1, 0].tick_params(axis='both', labelsize=20)
@@ -483,7 +454,7 @@ if (False):
     axs_kw_savings[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
     axs_kw_savings[0].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
     axs_kw_savings[0].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
-    axs_kw_savings[0].set_ylabel("Mean Power reduction change \n though charge strategy in kW", fontsize=20)
+    axs_kw_savings[0].set_ylabel("Mean Power reduction \n through charge strategy in kW", fontsize=20)
     axs_kw_savings[0].tick_params(axis='y', labelsize=20)
     axs_kw_savings[0].set_xlabel("Time in hours", fontsize=20)
 

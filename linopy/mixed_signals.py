@@ -158,7 +158,7 @@ for ct_year in [2018, 2019, 2020, 2021, 2022, 2023, 2024]:
     timesteps_all = pd.concat([timesteps_all, timesteps_ct], axis=0)
 timesteps_all_years = timesteps_all.drop_duplicates()
 
-network_charges_xr_all_years = f_load.load_network_charges(parameter_filepath_dsos, timesteps_all_years) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr_all_years, _ , _ , _ , _ , _, _   = f_load.load_network_charges(parameter_filepath_dsos, timesteps_all_years) # dimension: Time x DSO region x scenario (red, reg)
 network_charges_pandas_all_years = network_charges_xr_all_years.sel(s="red").drop("s").to_pandas()
 network_charges_pandas_all_years_unique = network_charges_pandas_all_years[~network_charges_pandas_all_years.index.duplicated(keep='first')]
 network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_years_unique[network_charges_pandas_all_years_unique.index.year<=2024]
@@ -243,7 +243,7 @@ ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
 ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
 
 ax_ssc.set_xlabel("Intraday price signal (IDA1) in ct/kWh \n \xa0 \n lower  ← | → higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
-ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Standard – Low  ← | → High – Standard",  fontsize=my_fontsize)
+ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Low - Standard  ← | → High – Standard",  fontsize=my_fontsize)
 
 
 # deduce regression points for 2018 - 2014
