@@ -229,13 +229,16 @@ def load_network_charges(input_filepath, timesteps):
     network_levels_H = (network_levels_HSN == "H").sum(axis=1)/4
     xr_ht_length = xr.DataArray(network_levels_H , dims="r" )
     
+    network_levels_N = (network_levels_HSN == "N").sum(axis=1)/4
+    xr_nt_length = xr.DataArray(network_levels_N , dims="r" )
+    
     # prepare secondary output no 3: ht/st price factor
-    xr_ht_div_st_fraction = xr.DataArray( charges_HSN.loc["H",:] / charges_HSN.loc["S",:] , dims="r")
+    xr_ht_charge = xr.DataArray( charges_HSN.loc["H",:] , dims="r")
+    xr_st_charge = xr.DataArray( charges_HSN.loc["S",:] , dims="r")
+    xr_nt_charge = xr.DataArray( charges_HSN.loc["N",:] , dims="r")
     
     
-    
-    
-    return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_ht_div_st_fraction
+    return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge
 
 
 def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):

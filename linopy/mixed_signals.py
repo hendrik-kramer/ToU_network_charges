@@ -86,7 +86,7 @@ all_prices_pivot_sorted.columns = all_prices_pivot_sorted.columns.str[0:-3]
 all_prices_pivot_sorted_wo_timeshift = pd.concat([all_prices_pivot_sorted.iloc[:,0:12], all_prices_pivot_sorted.iloc[:,16:]], axis=1)
 
 fig_signal, ax_signal = plt.subplots(layout='constrained')
-fig_signal.set_figwidth(18)
+fig_signal.set_figwidth(16)
 fig_signal.set_figheight(5)
 
 # put evening hours up front

@@ -4,3 +4,5 @@
 * manually add "conda install -c conda-forge netCDF4"
 * remove numpy with "pip uninstall numpy"
 * install numpy with "conda install numpy"
+* pip install scikit-learn
+
