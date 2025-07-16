@@ -17,6 +17,7 @@ from pathlib import Path
 import matplotlib.colors as mcolors
 from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 
+
 import glob
 import os
 import warnings
@@ -28,6 +29,7 @@ import functions_tariff_network_charge_study.load_functions as f_load
 
 
 my_fontsize = 20
+filename = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise\da_auktion_12_uhr_hourly\energy-charts_DAM_hourly_2018_2025.csv"
 
 
 
@@ -35,109 +37,70 @@ my_fontsize = 20
 # === BOX PLOT INPUT SPOT PRICES ====
 # ====================================
 
-print("load 15h auction data")
-files = glob.glob(os.path.join(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_input\preise", "id_auktion_15_uhr", '*.csv'))
-print(files)
-all_prices = pd.DataFrame()
-
-for ct_file in files:
-    
-    ct_csv = pd.read_csv(ct_file, skiprows=1)
-    warnings.filterwarnings("ignore")
-    ct_csv = ct_csv.set_index(pd.to_datetime(ct_csv["Delivery day"], format="%d/%m/%Y")).drop(columns="Delivery day")
-    warnings.filterwarnings("default")
-    ct_csv = ct_csv.drop(ct_csv.columns[ct_csv.columns.str.contains("Hour") == False], axis=1)
-    ct_csv.columns = ct_csv.columns.str.replace("Hour ","").str.replace("A","").str.replace("Q1","00:00").str.replace("Q2","15:00").str.replace("Q3","30:00").str.replace("Q4","45:00").str.replace(" ",":")
-    col_hours = [re.split(r'[:B]+', ct_col)[0] for ct_col in ct_csv.columns]
-    col_b = [re.findall(r'B', ct_col) for ct_col in ct_csv.columns]
-    col_b = [ct_col[0] if len(ct_col) > 0 else "" for ct_col in col_b]
-    col_rest = ct_csv.columns.to_series().str.split(":",n=1).str[1].to_list()
-    ct_csv.columns = pd.Series([str(int(ct_col)-1) for ct_col in col_hours]).astype(str) + col_b + [":"]*len(col_rest) + col_rest
-    ct_csv_stack = ct_csv.stack(level=-1, dropna=True).reset_index().rename(columns={"level_1":"time", 0:"spot_price"})
-    ct_csv_stack["helper_hour"] = ct_csv_stack["time"].str.split(':').str[0].str.replace("B",".5").astype(float)
-    ct_csv_stack = ct_csv_stack.sort_values(["Delivery day", "helper_hour"])
-    
-    all_prices = pd.concat([all_prices, ct_csv_stack], axis=0)
-    # cannot be sorted given 2x hour B
-all_prices = all_prices.reset_index()
-
-
-
 all_years_not_only_2024 = True
 
-
-# deduce mean of each day (15pm until 15pm next day)
-all_prices["spot_price_shifted_by_60_idx"] = all_prices["spot_price"].shift(-15*4)
-mean_prices = all_prices.groupby(by=all_prices["Delivery day"])["spot_price_shifted_by_60_idx"].mean()
-all_prices["daily_mean_price"] = all_prices["Delivery day"].map(mean_prices)
-all_prices["daily_spot_signal"] = all_prices["spot_price_shifted_by_60_idx"] - all_prices["daily_mean_price"] 
-all_prices["spot_signal_EUR_MWh"] = all_prices["daily_spot_signal"].shift(+15*4)
+all_prices = pd.read_csv(filename, skiprows=1).rename(columns={"Unnamed: 0":"time_utc", "Preis (EUR/MWh, EUR/tCO2)":"spot_signal_EUR_MWh"})
+all_prices["time_utc"] = pd.to_datetime(all_prices["time_utc"], utc=True).dt.tz_convert("Europe/Berlin")
 all_prices["spot_signal_ct_kWh"] = all_prices["spot_signal_EUR_MWh"]/10
+all_prices['Time_DE'] = pd.to_datetime(all_prices["time_utc"]).dt.tz_convert('Europe/Berlin')
+all_prices['iso_year'] = all_prices['Time_DE'].dt.isocalendar().year
+all_prices['iso_week'] = all_prices['Time_DE'].dt.isocalendar().week
+all_prices["Delivery day"] = pd.to_datetime(all_prices['Time_DE'].dt.date).astype(str)
+all_prices["time"] = all_prices['Time_DE'].dt.time.astype(str)
 
 if not(all_years_not_only_2024):
-    # select only2024 prices
-    all_prices = all_prices[ pd.to_datetime(all_prices["Delivery day"]).dt.year == 2024]
+    all_prices = all_prices[all_prices["Time_DE"].dt.year==2024]
+else:
+    all_prices = all_prices[(all_prices["Time_DE"].dt.year>=2018) & (all_prices["Time_DE"].dt.year<=2024)]
+all_prices_pivot = all_prices.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
 
+# put evening hours up front
+# deduce mean of planning period 35 h
+all_prices_pivot_shifted = pd.concat([all_prices_pivot.iloc[:,13:24], all_prices_pivot.iloc[:,0:24].shift(-1), ], axis=1)
+all_prices_pivot_shifted_daily_mean = all_prices_pivot_shifted.mean(axis=1)
+all_prices_pivot_minus_mean = all_prices_pivot.sub(all_prices_pivot_shifted_daily_mean, axis="rows")
 
-all_prices_pivot = all_prices.pivot(index="Delivery day", columns="time", values="spot_signal_ct_kWh")
-all_prices_pivot_sorted = pd.concat([all_prices_pivot.iloc[:,0:4],  all_prices_pivot.iloc[:,44:48],  all_prices_pivot.iloc[:,64:68], all_prices_pivot.iloc[:,68:], all_prices_pivot.iloc[:,4:44], all_prices_pivot.iloc[:,48:64]], axis=1)
-all_prices_pivot_sorted.columns = all_prices_pivot_sorted.columns.str[0:-3]
+# calculate 5% 95% quantile values
+q95 = all_prices_pivot_minus_mean.quantile(q=0.95).to_frame().reset_index().reset_index()
+q95["index"] = q95["index"].shift(-1)
+q95.loc[23, "index"] = 24.0
+q05 = all_prices_pivot_minus_mean.quantile(q=0.05).to_frame().reset_index().reset_index()
+q05["index"] = q05["index"].shift(-1)
+q05.loc[23, "index"] = 24.0
+q05["hour_str"] = q05["time"].str.split(":").str[0].astype(str)
 
-all_prices_pivot_sorted_wo_timeshift = pd.concat([all_prices_pivot_sorted.iloc[:,0:12], all_prices_pivot_sorted.iloc[:,16:]], axis=1)
-
+# start with plot
 fig_signal, ax_signal = plt.subplots(layout='constrained')
 fig_signal.set_figwidth(16)
 fig_signal.set_figheight(5)
 
-# put evening hours up front
-all_prices_pivot_sorted_wo_timeshift_eve = pd.concat([all_prices_pivot_sorted_wo_timeshift.iloc[:,60:], all_prices_pivot_sorted_wo_timeshift.iloc[:,0:60]], axis=1)
-
 meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black', markersize=4) #firebrick
-ax_signal = all_prices_pivot_sorted_wo_timeshift_eve.plot(ax=ax_signal, kind="box", whis=(10, 90), patch_artist=True, widths=0.8, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+ax_signal = all_prices_pivot_minus_mean.plot(ax=ax_signal, kind="box", whis=(10, 90), patch_artist=True, widths=0.8, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
 
-
-q95 = all_prices_pivot_sorted_wo_timeshift_eve.quantile(q=0.95).to_frame().reset_index().reset_index()
-q95["index"] = q95["index"].shift(-1)
-q95.loc[95, "index"] = 96.0
-q05 = all_prices_pivot_sorted_wo_timeshift_eve.quantile(q=0.05).to_frame().reset_index().reset_index()
-q05["index"] = q05["index"].shift(-1)
-q05.loc[95, "index"] = 96.0
-q05["hour_str"] = q05["time"].str.split(":").str[0].astype(str)
-
-
-# start with plot
-
-ax_singal2= q95.plot(ax=ax_signal, x="index", y=0.95, kind="scatter", marker="_", color="k", zorder=2)
+ax_singal2 = q95.plot(ax=ax_signal, x="index", y=0.95, kind="scatter", marker="_", color="k", zorder=2, s=150)
 ax_singal2.xaxis.set_visible(False)
-ax_singal3 = q05.plot(ax=ax_signal, x="index", y=0.05, kind="scatter", marker="_", color="k", zorder=2)
+ax_singal3 = q05.plot(ax=ax_signal, x="index", y=0.05, kind="scatter", marker="_", color="k", zorder=2, s=150)
 ax_singal3.set_xticklabels(q05["hour_str"])
 
 ax_singal3.xaxis.set_visible(True)
-
-#ax_singal3.set_xticklabels(list(q05["hour_str"]))
-
-for i, label in enumerate(ax_singal3.get_xticklabels()):
-    if i % 4 != 0:
-        label.set_visible(False)  # Hide labels not multiple of 4
-    
+ax_singal3.set_xticklabels(list(q05["hour_str"]))
 
 ax_signal.grid(which='major', axis='y', linestyle='--', color="lightgray")
 ax_signal.set_ylabel("Price difference in ct/kWh", fontsize=my_fontsize)
 ax_signal.set_xlabel("Hour of the day", fontsize=my_fontsize)
-ax_signal.set_yticks([-12, -10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12])
-ax_signal.set_ylim(-12,14)
 
-ax_signal.hlines(y=[0], xmin=-1, xmax=98, colors=['lightgray'], linestyles=['-'], linewidth=2, zorder=0)
-ax_signal.vlines(x=np.arange(1, 97, 4), ymin=-20, ymax=20, colors=['lightgray'], linestyles=['--'], linewidth=1, zorder=0)
+ax_signal.set_yticks([-10, -8, -6, -4, -2, 0, 2, 4, 6, 8, 10, 12])
+ax_signal.set_ylim(-10,12)
 
-ax_signal.set_xlim(0,97)
+ax_signal.hlines(y=[0], xmin=-1, xmax=24, colors=['lightgray'], linestyles=['-'], linewidth=2, zorder=0)
+ax_signal.set_xlim(0.5,24.5)
 
 if all_years_not_only_2024:
     ax_signal.set_title("2018 – 2024", fontsize=my_fontsize)
-    fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_spot_signal_2018_2024.svg", format="svg")
+    fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_da_spot_signal_2018_2024.svg", format="svg")
 else:
     ax_signal.set_title("2024", fontsize=my_fontsize)
-    fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_spot_signal_2024.svg", format="svg")
+    fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_da_spot_signal_2024.svg", format="svg")
 
 
 
@@ -146,7 +109,37 @@ else:
 # ===== MIXED SIGNALS HEATMAP + REGRESSION =====
 # ==============================================
 
-# MAKE SURE, THAT ALL YEARS 2018-2024 are in price data !!!
+# load all 
+all_prices = pd.read_csv(filename, skiprows=1).rename(columns={"Unnamed: 0":"time_utc", "Preis (EUR/MWh, EUR/tCO2)":"spot_signal_EUR_MWh"})
+all_prices["time_utc"] = pd.to_datetime(all_prices["time_utc"], utc=True).dt.tz_convert("Europe/Berlin")
+all_prices["spot_signal_ct_kWh"] = all_prices["spot_signal_EUR_MWh"]/10
+all_prices['Time_DE'] = pd.to_datetime(all_prices["time_utc"]).dt.tz_convert('Europe/Berlin')
+all_prices['iso_year'] = all_prices['Time_DE'].dt.isocalendar().year
+all_prices['iso_week'] = all_prices['Time_DE'].dt.isocalendar().week
+all_prices["Delivery day"] = pd.to_datetime(all_prices['Time_DE'].dt.date).astype(str)
+all_prices["time"] = all_prices['Time_DE'].dt.time.astype(str)
+all_prices = all_prices[(all_prices["Time_DE"].dt.year>=2018) & (all_prices["Time_DE"].dt.year<=2024)] # always all years
+all_prices_pivot = all_prices.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
+
+# put evening hours up front
+# deduce mean of planning period 35 h
+all_prices_pivot_shifted = pd.concat([all_prices_pivot.iloc[:,13:24], all_prices_pivot.iloc[:,0:24].shift(-1), ], axis=1)
+all_prices_pivot_shifted_daily_mean = all_prices_pivot_shifted.mean(axis=1)
+all_prices_pivot_minus_mean = all_prices_pivot.sub(all_prices_pivot_shifted_daily_mean, axis="rows")
+
+# unpivot to get timeseries again
+all_prices_minus_mean = all_prices_pivot_minus_mean.transpose().unstack().reset_index().rename(columns={0:"spot_signal_ct_kWh"})
+all_prices_minus_mean["datetime"] = pd.to_datetime(all_prices_minus_mean["Delivery day"] + " " + all_prices_minus_mean["time"])
+all_prices_minus_mean = all_prices_minus_mean.drop(columns=["Delivery day", "time"]).set_index("datetime")
+
+# retime to quarter hours
+all_prices_minus_mean_15min = all_prices_minus_mean.resample("15min").mean().ffill()
+all_prices_minus_mean_15min.loc[pd.to_datetime("2024-12-31 23:15:00"),:] = all_prices_minus_mean_15min.iloc[-1]["spot_signal_ct_kWh"]
+all_prices_minus_mean_15min.loc[pd.to_datetime("2024-12-31 23:30:00"),:] = all_prices_minus_mean_15min.iloc[-1]["spot_signal_ct_kWh"]
+all_prices_minus_mean_15min.loc[pd.to_datetime("2024-12-31 23:45:00"),:] = all_prices_minus_mean_15min.iloc[-1]["spot_signal_ct_kWh"]
+all_prices_minus_mean_15min.index.name = ""
+
+#all_prices_minus_mean_15min_xr = xr.DataArray(all_prices_minus_mean_15min["spot_signal_ct_kWh"], dims="t")
 
 # ===== LOAD NETWORK CHARGES ====
 
@@ -167,14 +160,8 @@ network_charges_signal = network_charges_pandas_all_years_unique_no_2025 - netwo
 
 
 
-
-
-
 # ===== HEATMAP PLOT =====
 
-fig_signal_scatter, ax_ssc = plt.subplots(layout='constrained')
-fig_signal_scatter.set_figwidth(18)
-fig_signal_scatter.set_figheight(7) # irrelevant due to aspect = equal
 
 
 # ===== years 2018 - 2024 =====
@@ -182,26 +169,30 @@ x_vals = []
 y_vals = []
 for ct_dsos in network_charges_signal.columns:
     htnt = (network_charges_signal[ct_dsos] != 0)
-    #ax_ssc.scatter(all_prices["spot_signal_ct_kWh"][htnt.values], network_charges_signal[ct_dsos][htnt.values], alpha=0.002, facecolor="blue", zorder=1)  
     y_vals.extend(list( network_charges_signal[ct_dsos][htnt.values]))
-    x_vals.extend(list( all_prices["spot_signal_ct_kWh"][htnt.values]))
+    x_vals.extend(list( all_prices_minus_mean_15min["spot_signal_ct_kWh"][htnt.values]))
 
 pd_all_data = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
-#pd_all_data_selected = pd_all_data[(pd_all_data.xvals>=-45) & (pd_all_data.xvals<=45)]
+
 
 # ===== only 2024 =====
 x_vals_2024 = []
 y_vals_2024 = []
 network_charges_signal_2024 = network_charges_signal[network_charges_signal.index.year==2024]
-all_prices_2024 = all_prices[pd.to_datetime(all_prices["Delivery day"]).dt.year == 2024]
+all_prices_2024 = all_prices_minus_mean_15min[all_prices_minus_mean_15min.index.year == 2024]
 for ct_dsos in network_charges_signal_2024.columns:
     htnt = (network_charges_signal_2024[ct_dsos] != 0)
-    #ax_ssc.scatter(all_prices["spot_signal_ct_kWh"][htnt.values], network_charges_signal[ct_dsos][htnt.values], alpha=0.002, facecolor="blue", zorder=1)  
     y_vals_2024.extend(list( network_charges_signal_2024[ct_dsos][htnt.values]))
     x_vals_2024.extend(list( all_prices_2024["spot_signal_ct_kWh"][htnt.values]))
 
 pd_all_data_2024 = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
-#pd_all_data_selected = pd_all_data[(pd_all_data.xvals>=-45) & (pd_all_data.xvals<=45)]
+
+
+
+
+fig_signal_scatter, ax_ssc = plt.subplots(layout='constrained')
+fig_signal_scatter.set_figwidth(18)
+fig_signal_scatter.set_figheight(7) # irrelevant due to aspect = equal
 
 
 #len(pd_all_data_selected) / len(pd_all_data) # data not in plot
@@ -211,14 +202,52 @@ ax_ssc.axis('equal')
 xx = 40
 yy = 40/3
 
+#ax_ssc.set_xlim(xmin=-xx, xmax=xx)
+#ax_ssc.set_ylim(-yy,yy)
+
 # create gridded heatmap
 heatmap, xedges, yedges = np.histogram2d(pd_all_data.xvals, pd_all_data.yvals, bins=[600,200])
-heatmap = np.where(heatmap==0, np.nan, heatmap)
+heatmap = np.where(heatmap==0, np.nan, heatmap).T
 extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
-hist_signal = ax_ssc.imshow(heatmap.T, extent=extent, origin='lower', cmap="viridis_r")
+
+hist_signal = ax_ssc.imshow(heatmap, extent=extent, origin='lower', cmap="viridis_r")
+
+
+# deduce median heatmap
+if (False):
+    heatmap_zero = heatmap
+    heatmap_zero[np.isnan(heatmap_zero)] = 0
+    rowsum = heatmap_zero.sum(axis=1)
+    
+    idx_median = np.zeros(len(rowsum))
+    for ct_row in range(0, len(rowsum)):
+        if rowsum[ct_row] > 0:  
+            #idx_median[ct_row] = np.argwhere(heatmap_zero[ct_row,:] == np.percentile(heatmap_zero[ct_row,:], 50, interpolation='nearest'))
+            #idx_median[ct_row] = heatmap_zero[ct_row,:].index(np.percentile(heatmap_zero[ct_row,:],50,interpolation='nearest'))
+            idx_median[ct_row] = np.argsort(heatmap_zero[ct_row,:])[int((len(heatmap_zero[ct_row,:]) - 1) * 0.5)]
+        else:
+            idx_median[ct_row] = np.nan
+    
+    # remove implausible values
+    rowsum[(idx_median>550) | (idx_median<50)] = 0
+
+    heatmap_red = np.zeros((200,600,))
+    rows = np.linspace(0,199,200, dtype=int)
+    for ct_row in rows[rowsum>0]:
+        heatmap_red[ct_row, idx_median[ct_row].astype(np.int64)] = 1        
+    heatmap_red = np.where(heatmap_red==0, 0, heatmap_red)
+    
+    cmap_red = mcolors.ListedColormap(['none', 'red'])
+    bounds = [-0.5, 0.5, 1.5]
+    norm = mcolors.BoundaryNorm(bounds, cmap_red.N)
+    
+    ax_ssc.imshow(heatmap_red, extent=extent, origin='lower', cmap=cmap_red, zorder=2)
+
+
 ax_ssc.set_aspect('equal',adjustable='box')
 ax_ssc.tick_params(axis='x', labelsize=my_fontsize)
 ax_ssc.tick_params(axis='y', labelsize=my_fontsize)
+
 
 
 # add colorbar
@@ -242,8 +271,8 @@ ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
 
 ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
 
-ax_ssc.set_xlabel("Intraday price signal (IDA1) in ct/kWh \n \xa0 \n lower  ← | → higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
-ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Low - Standard  ← | → High – Standard",  fontsize=my_fontsize)
+ax_ssc.set_xlabel("Day ahead price signal (DA) in ct/kWh \n \xa0 \n lower  ← | → higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
+ax_ssc.set_ylabel("Network charge signal in ct/kWh \n \xa0 \n Low – Standard  ← | → High – Standard",  fontsize=my_fontsize)
 
 
 # deduce regression points for 2018 - 2014
@@ -252,10 +281,10 @@ y_vec  = np.array(y_vals).round(4)[~np.isnan(x_vals)]
 x_vec_nonan = np.array(x_vec)[~np.isnan(y_vec)]
 y_vec_nonan  = np.array(y_vec)[~np.isnan(y_vec)]
 
-x_vec_nonan_pos = x_vec_nonan[x_vec_nonan>0]
-y_vec_nonan_pos = y_vec_nonan[x_vec_nonan>0]
-x_vec_nonan_neg = x_vec_nonan[x_vec_nonan<0]
-y_vec_nonan_neg = y_vec_nonan[x_vec_nonan<0]
+x_vec_nonan_pos = x_vec_nonan[y_vec_nonan>0]
+y_vec_nonan_pos = y_vec_nonan[y_vec_nonan>0]
+x_vec_nonan_neg = x_vec_nonan[y_vec_nonan<0]
+y_vec_nonan_neg = y_vec_nonan[y_vec_nonan<0]
 
 # deduce regression points for 2014
 x_vec_2024  = np.array(x_vals_2024).round(4)[~np.isnan(x_vals_2024)]
@@ -263,27 +292,47 @@ y_vec_2024  = np.array(y_vals_2024).round(4)[~np.isnan(x_vals_2024)]
 x_vec_nonan_2024 = np.array(x_vec_2024)[~np.isnan(y_vec_2024)]
 y_vec_nonan_2024  = np.array(y_vec_2024)[~np.isnan(y_vec_2024)]
 
-x_vec_nonan_pos_2024 = x_vec_nonan_2024[x_vec_nonan_2024>0]
-y_vec_nonan_pos_2024 = y_vec_nonan_2024[x_vec_nonan_2024>0]
-x_vec_nonan_neg_2024 = x_vec_nonan_2024[x_vec_nonan_2024<0]
-y_vec_nonan_neg_2024 = y_vec_nonan_2024[x_vec_nonan_2024<0]
+x_vec_nonan_pos_2024 = x_vec_nonan_2024[y_vec_nonan_2024>0]
+y_vec_nonan_pos_2024 = y_vec_nonan_2024[y_vec_nonan_2024>0]
+x_vec_nonan_neg_2024 = x_vec_nonan_2024[y_vec_nonan_2024<0]
+y_vec_nonan_neg_2024 = y_vec_nonan_2024[y_vec_nonan_2024<0]
+
+x_vec_nonan_pos_mean = x_vec_nonan_pos.mean()
+y_vec_nonan_pos_mean = y_vec_nonan_pos.mean()
+x_vec_nonan_neg_mean = x_vec_nonan_neg.mean()
+y_vec_nonan_neg_mean = y_vec_nonan_neg.mean()
+x_vec_nonan_pos_2024_mean = x_vec_nonan_pos_2024.mean()
+y_vec_nonan_pos_2024_mean = y_vec_nonan_pos_2024.mean()
+x_vec_nonan_neg_2024_mean = x_vec_nonan_neg_2024.mean()
+y_vec_nonan_neg_2024_mean = y_vec_nonan_neg_2024.mean()
 
 # do regressions
-a_reg_pos, residuals_pos, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_pos]).T, y_vec_nonan_pos, rcond=None)
-a_reg_neg, residuals_neg, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_neg]).T, y_vec_nonan_neg, rcond=None)
-a_reg_pos_2024, residuals_pos_2024, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_pos_2024]).T, y_vec_nonan_pos_2024, rcond=None)
-a_reg_neg_2024, residuals_neg_2024, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_neg_2024]).T, y_vec_nonan_neg_2024, rcond=None)
+a_reg_pos, residuals_pos, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_pos]).T, y_vec_nonan_pos.T, rcond=None)
+a_reg_neg, residuals_neg, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_neg]).T, y_vec_nonan_neg.T, rcond=None)
+a_reg_pos_2024, residuals_pos_2024, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_pos_2024]).T, y_vec_nonan_pos_2024.T, rcond=None)
+a_reg_neg_2024, residuals_neg_2024, _, _ = np.linalg.lstsq(np.vstack([x_vec_nonan_neg_2024]).T, y_vec_nonan_neg_2024.T, rcond=None)
 
-x_pos_vals = np.linspace(0, 50)
-x_neg_vals = np.linspace(-50,0)
+x_pos_vals = np.linspace(0, 70)
+x_neg_vals = np.linspace(-70,0)
 
-ax_ssc.plot(x_pos_vals, a_reg_pos*x_pos_vals, color="blue", linestyle="-", linewidth=2, label="2018-2024") # \n (m_pos=" + "{:.4f}".format(a_reg_pos[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg[0]) + ")"  )
-ax_ssc.plot(x_neg_vals, a_reg_neg*x_neg_vals, color="blue", linestyle="-", linewidth=2, label=None)
-ax_ssc.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="lightblue", linestyle="-", linewidth=2, label="only 2024") #" \n (m_pos=" + "{:.4f}".format(a_reg_pos_2024[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg_2024[0]) + ")"  )
-ax_ssc.plot(x_neg_vals, a_reg_neg_2024*x_neg_vals, color="lightblue", linestyle="-", linewidth=2, label=None)
+#ax_ssc.plot(x_pos_vals, a_reg_pos*x_pos_vals, color="blue", linestyle="-", linewidth=2, label="2018-2024") # \n (m_pos=" + "{:.4f}".format(a_reg_pos[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg[0]) + ")"  )
+#ax_ssc.plot(x_neg_vals, a_reg_neg*x_neg_vals, color="blue", linestyle="-", linewidth=2, label=None)
+#ax_ssc.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="lightblue", linestyle="-", linewidth=2, label="only 2024") #" \n (m_pos=" + "{:.4f}".format(a_reg_pos_2024[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg_2024[0]) + ")"  )
+#ax_ssc.plot(x_neg_vals, a_reg_neg_2024*x_neg_vals, color="lightblue", linestyle="-", linewidth=2, label=None)
 
-plt.legend(loc="lower right", title="    linear regression \n   through origin for \nupper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
+ax_ssc.scatter(x_vec_nonan_pos_mean, y_vec_nonan_pos_mean, color="blue", label="2018-2024", facecolors='none', linewidth=2, s=100) # \n (m_pos=" + "{:.4f}".format(a_reg_pos[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg[0]) + ")"  )
+ax_ssc.scatter(x_vec_nonan_neg_mean, y_vec_nonan_neg_mean, color="blue", label=None, facecolors='none', linewidth=2, s=100)
+ax_ssc.scatter(x_vec_nonan_pos_2024_mean, y_vec_nonan_pos_2024_mean, color="darkred", label="only 2024", s=100, marker="x", linewidth=2,) # \n (m_pos=" + "{:.4f}".format(a_reg_pos[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg[0]) + ")"  )
+ax_ssc.scatter(x_vec_nonan_neg_2024_mean, y_vec_nonan_neg_2024_mean, color="darkred", label=None, s=100, marker="x", linewidth=2)
 
+#plt.legend(loc="lower right", title="    mean regression \n   through origin for \nupper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
+plt.legend(loc="lower right", title="        Centroids for \n upper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
+
+
+if (False):
+    fig_test, ax_test = plt.subplots(layout='constrained')
+    ax_test.scatter(x_vec_nonan_pos_2024, y_vec_nonan_pos_2024, alpha=0.01)
+    ax_test.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="red", linestyle="-", linewidth=2, label="only 2024") #" \n (m_pos=" + "{:.4f}".format(a_reg_pos_2024[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg_2024[0]) + ")"  )
 
 
 
@@ -304,6 +353,6 @@ q4 = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0))
 ax_ssc.set_xlim(xmin=-xx, xmax=xx)
 ax_ssc.set_ylim(-yy,yy)
 
-fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_signals.svg", format="svg")
+fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_da_signals.svg", format="svg")
 
 

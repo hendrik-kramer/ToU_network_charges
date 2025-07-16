@@ -60,7 +60,8 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
         raw_price_data['iso_week'] = raw_price_data['Time_DE'].dt.isocalendar().week
         raw_price_data["Value"] = raw_price_data["Value"]/10 # €/MWh --> ct/kWh
     
-        price_data = raw_price_data[(raw_price_data['iso_year']==input_year)]
+        #price_data = raw_price_data[(raw_price_data['iso_year']==input_year)]
+        price_data = raw_price_data
         price_data.loc[:,"DateTime"] = pd.to_datetime(price_data["Time_DE"])
         
         price_data["Quarter"] = "Q" + np.ceil(pd.to_datetime(price_data["DateTime"]).dt.month/3).astype(int).astype(str)

@@ -36,7 +36,7 @@ parameters_opti = {
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "auction": "da_auction_hourly_12_uhr_linInterpol",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "prices": "spot", # "spot", "mean"
-    "settings_obj_fnct": "scheduled_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
     "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
@@ -70,7 +70,7 @@ timesteps = f_load.load_timesteps(parameters_opti["year"])
 
 # Load spot prices
 parameter_folderpath_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
-spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, parameters_opti["auction"], timesteps) # "da_auktion_12_uhr", "id_auktion_15_uhr" # in ct/kWh
+spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, parameters_opti["auction"], timesteps)  # in ct/kWh
 tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
@@ -127,7 +127,7 @@ dso_subset = parameters_opti["dso_subset"]
 emob_subset = parameters_opti["emob_subset"]
 tso_subset = parameters_opti["tso_subset"]
 timesteps = timesteps.loc[time_subset]
-spot_prices_xr = spot_prices_xr.isel(t=time_subset)
+spot_prices_xr = spot_prices_xr.isel(t=time_subset).fillna(10)
 network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
 emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
 emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
@@ -161,7 +161,7 @@ for chunk_dso in list_of_dso_chunks:
         rolling_timesteps = [range(0, 24*4)] # first day (including) 3 pm until 23:45 --> minor error as after 1st day: soc 23:45 == 0:00 2nd day, otherwise no issue due to overlapping period
         for ct_day in unique_days[:-1]: # until second last day (since "shorter" last day is irrelevant due to no new information)
             ct_next_day = ct_day + timedelta(days=1)
-            day_min_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_day) & (timesteps_from_zero["DateTime"].dt.hour == 15) & (timesteps_from_zero["DateTime"].dt.minute == 0)].index.item()
+            day_min_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_day) & (timesteps_from_zero["DateTime"].dt.hour == 13) & (timesteps_from_zero["DateTime"].dt.minute == 0)].index.item()
             day_max_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_next_day) & (timesteps_from_zero["DateTime"].dt.hour == 23) & (timesteps_from_zero["DateTime"].dt.minute == 45)].index.item()           
             rolling_timesteps.append( range(day_min_idx, day_max_idx+1))
         

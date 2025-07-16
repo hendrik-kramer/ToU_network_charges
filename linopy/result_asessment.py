@@ -482,7 +482,7 @@ if (False):
         
     axs_kw_savings[1].set_ylim(y_min, y_max)
     axs_kw_savings[1].set_xlabel("Time in hours", fontsize=20)
-    axs_kw_savings[1].set_ylabel("Mean Power reduction change \n for smart charging tariffs in kW", fontsize=20)
+    axs_kw_savings[1].set_ylabel("Mean Power reduction \n for smart charging tariffs in kW", fontsize=20)
     axs_kw_savings[1].set_ylim(-0.2, 0.6)
     axs_kw_savings[1].tick_params(axis='y', labelsize=20)
     axs_kw_savings[1].set_xlim(0, 24)
