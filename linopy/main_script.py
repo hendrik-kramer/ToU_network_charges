@@ -39,8 +39,8 @@ parameters_opti = {
     "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
-    "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,50),
+    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,10),
     "tso_subset" : range(4,5),
     }
 
@@ -158,7 +158,7 @@ for chunk_dso in list_of_dso_chunks:
     if parameters_opti["rolling_window"] == "day":
         unique_days = timesteps["DateTime"].dt.date.unique()
         
-        rolling_timesteps = [range(0, 24*4)] # first day (including) 3 pm until 23:45 --> minor error as after 1st day: soc 23:45 == 0:00 2nd day, otherwise no issue due to overlapping period
+        rolling_timesteps = [range(0, 24*4)] # minor error as after 1st day: soc 23:45 == 0:00 2nd day, otherwise no issue due to overlapping period
         for ct_day in unique_days[:-1]: # until second last day (since "shorter" last day is irrelevant due to no new information)
             ct_next_day = ct_day + timedelta(days=1)
             day_min_idx = timesteps_from_zero[(timesteps_from_zero["DateTime"].dt.date == ct_day) & (timesteps_from_zero["DateTime"].dt.hour == 13) & (timesteps_from_zero["DateTime"].dt.minute == 0)].index.item()
@@ -177,9 +177,9 @@ for chunk_dso in list_of_dso_chunks:
             
             timesteps_roll = timesteps.iloc[list(ct_rolling)]
             
-            # cut off time after 15 pm of the next day for saving results, but exclude last day
+            # cut off time after 13 pm of the next day for saving results, but exclude last day
             if ct_rolling[0] < rolling_timesteps[-1][0]: # "this start time is smaller than last day's start time"
-                timesteps_today = timesteps_roll[timesteps_roll.DateTime <= timesteps_roll.DateTime.iloc[-1] - pd.Timedelta(9, "h")]
+                timesteps_today = timesteps_roll[timesteps_roll.DateTime <= timesteps_roll.DateTime.iloc[-1] - pd.Timedelta(11, "h")]
             else:
                 timesteps_today = timesteps_roll
                                                  
@@ -227,12 +227,12 @@ for chunk_dso in list_of_dso_chunks:
 
 
 
-            # storage rolling takes place each day: pass 15:00 value as init soc for next day 
+            # storage rolling takes place each day: pass 13:00 value as init soc for next day 
             pd.set_option("mode.chained_assignment", None)  
             timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
             pd.set_option("mode.chained_assignment", "warn")    
 
-            idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==15) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
+            idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==13) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
     
             soc_ev_last = m["SOC_EV"].solution.isel(t=idx_to_roll.counter_id)
             if parameters_opti["settings_setup"] != "only_EV":
@@ -244,7 +244,7 @@ for chunk_dso in list_of_dso_chunks:
             if first_iteration:
                 result_C_OP_ALL_roll = m["C_OP_ALL"].solution
                 result_C_OP_HOME_roll = m["C_OP_HOME"].solution
-                result_SOC_EV_roll = m["SOC_EV"].solution.isel(t=range(0,idx_to_roll.counter_id)) # slight error, as only values including 14:45 are copied ...
+                result_SOC_EV_roll = m["SOC_EV"].solution.isel(t=range(0,idx_to_roll.counter_id)) # slight error, as only values including 12:45 are copied ...
                 result_P_BUY_roll =  m["P_BUY"].solution.isel(t=range(0,idx_to_roll.counter_id))  # ... are also used as initial soc for next optimization, see above.
                 result_P_EV_NOT_HOME_roll = m["P_EV_NOT_HOME"].solution.isel(t=range(0,idx_to_roll.counter_id))
                 #result_SOC_MISSING_roll = m["SOC_MISSING"].solution.isel(t=range(0,idx_to_roll.counter_id))

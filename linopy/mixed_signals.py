@@ -106,7 +106,7 @@ else:
 
 
 # ==============================================
-# ===== MIXED SIGNALS HEATMAP + REGRESSION =====
+# ===== MIXED SIGNALS HEATMAP + CENTROIDS =====
 # ==============================================
 
 # load all 
