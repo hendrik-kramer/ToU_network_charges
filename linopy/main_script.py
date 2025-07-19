@@ -36,7 +36,7 @@ parameters_opti = {
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "auction": "da_auction_hourly_12_uhr_linInterpol",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "prices": "spot", # "spot", "mean"
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "smart_charging"
+    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "partfill_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
     "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
@@ -48,7 +48,7 @@ parameters_model = {
     "ev_p_charge_home":11, # kW
     "ev_soc_max": 70, # kWh
     "ev_soc_init_rel": 0.9, # %
-    "ev_soc_preference": 0.95, # %
+    "ev_soc_preference": 1, # %
     "ev_soc_departure": 0.95, # %
     "ev_p_charge_not_home": 22, # kW
     "ev_eta_in": 0.95,
@@ -121,7 +121,7 @@ list_of_dso_chunks = [lst[round(length_dso_chunk * i):round(length_dso_chunk * (
 if parameters_opti["quarter"] != "all":
     time_subset = timesteps[timesteps["Quarter"] == parameters_opti["quarter"]].index 
 else:
-    time_subset = timesteps[timesteps.DateTime.dt.year==parameters_opti["year"]].index   # can be improved, load emobpy data for iso calendar, not only exact 2024
+    time_subset = timesteps[timesteps.DateTime.dt.year==parameters_opti["year"]].index   # irrelevant, when timesteps is loaded, this is already accounted for
 
 dso_subset = parameters_opti["dso_subset"]
 emob_subset = parameters_opti["emob_subset"]
@@ -223,7 +223,7 @@ for chunk_dso in list_of_dso_chunks:
          
             if m["P_EV_NOT_HOME"].solution.sum().item() > 0:
                 print("P_EV_NOT_HOME")
-                print(m["P_EV_NOT_HOME"].solution.sum(dim=["t","r","s"]))
+                print(m["P_EV_NOT_HOME"].solution.sum(["t"]).mean(dim=["r","s"]))
 
 
 

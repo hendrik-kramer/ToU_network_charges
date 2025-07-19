@@ -157,79 +157,103 @@ if (False): # Total Cost for scheduled and smart charging // Annual cost savings
     folder_str = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + r"\\"
     
     # scheduled charge EV
-    immediate_spot_only_charge = folder_str + r"2025-07-10_14-54_all_spot_immediate_charging_only_EV_r50_v10" + r"\\"
-    scheduled_spot_only_charge = folder_str + r"2025-07-10_11-32_all_spot_scheduled_charging_only_EV_r50_v10" + r"\\"
-    smart_spot_only_charge = folder_str + r"2025-07-10_11-37_all_spot_smart_charging_only_EV_r50_v10" + r"\\"
-    immediate_mean_only_charge = folder_str + r"2025-07-09_22-11_all_mean_immediate_charging_only_EV_r50_v10" + r"\\"
-    scheduled_mean_only_charge = folder_str + r"2025-07-10_00-59_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\"
-    smart_mean_only_charge = folder_str + r"2025-07-10_01-00_all_mean_smart_charging_only_EV_r50_v10" + r"\\"
+    immediate_mean_only_charge = folder_str + r"2025-07-19_13-23_all_mean_immediate_charging_only_EV_r10_v10" + r"\\"
+    immediate_spot_only_charge = folder_str + r"2025-07-19_17-51_all_spot_immediate_charging_only_EV_r10_v10" + r"\\"
+    scheduled_mean_only_charge = folder_str + r"2025-07-19_14-19_all_mean_scheduled_charging_only_EV_r10_v10" + r"\\"
+    scheduled_spot_only_charge = folder_str + r"2025-07-19_18-29_all_spot_scheduled_charging_only_EV_r10_v10" + r"\\" 
+    smart_mean_only_charge = folder_str +     r"2025-07-19_14-54_all_mean_smart_charging_only_EV_r10_v10" + r"\\"
+    smart_spot_only_charge = folder_str +     r"2025-07-19_19-07_all_spot_smart_charging_only_EV_r10_v10" + r"\\"
+
+   
+
+
+    # Test section
+    if (False):
+        p_immediate_mean_standard = xr.open_dataarray(immediate_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="reg").to_pandas()
+        p_immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="red").to_pandas()
+        p_scheduled_mean_standard = xr.open_dataarray(scheduled_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="reg").to_pandas()
+        p_scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="red").to_pandas()
+        p_smart_mean_standard = xr.open_dataarray(smart_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="reg").to_pandas()
+        p_smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "P_BUY.nc").sel(r="Westnetz", v="0", s="red").to_pandas()
+   
+        plt.plot(p_immediate_mean_standard, linewidth=4, label="static standard", linestyle="-")
+        plt.plot(p_immediate_mean_ToU, linewidth=3, label="static ToU", linestyle="--")
+        plt.plot(p_immediate_spot_standard, linewidth=2, label="dynamic standard")
+        plt.plot(p_immediate_spot_ToU, linewidth=1, label="dynamic ToU")
+      
+        plt.legend()
+
+
 
     # data preparation
-    dso_x_ev = 500
-    immediate_spot_static = xr.open_dataarray(immediate_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    cost_type_file = "C_OP_ALL.nc"  # "C_OP_ALL.nc", "C_OP_HOME.nc" (no price spikes for scheduled charging due to public pole charging)
+    result_shape = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="reg").shape
+    dso_x_ev = result_shape[0] * result_shape[1]
+    immediate_spot_standard = xr.open_dataarray(immediate_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
     immediate_spot_ToU = xr.open_dataarray(immediate_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    scheduled_spot_static = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    scheduled_spot_standard = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
     scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    smart_spot_static = xr.open_dataarray(smart_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_spot_standard = xr.open_dataarray(smart_spot_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
     smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
 
-    immediate_mean_static = xr.open_dataarray(immediate_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    scheduled_mean_static = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
-    smart_mean_static = xr.open_dataarray(smart_mean_only_charge + "C_OP_ALL.nc").sel(s="reg").to_numpy().reshape(dso_x_ev)
-    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + "C_OP_ALL.nc").sel(s="red").to_numpy().reshape(dso_x_ev)
+    immediate_mean_standard = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)
+    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_standard = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)
+    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)
+    smart_mean_standard = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)
 
-    pd_ToU_static_spot = pd.DataFrame({'immediate':immediate_spot_static, 'scheduled':scheduled_spot_static, 'smart':smart_spot_static})
-    pd_ToU_dynamic_spot = pd.DataFrame({'immediate': immediate_spot_ToU, 'scheduled':scheduled_spot_ToU, 'smart':smart_spot_ToU})
+    pd_standard_static = pd.DataFrame({'immediate':immediate_mean_standard, 'scheduled':scheduled_mean_standard, 'smart':smart_mean_standard})
+    pd_standard_dynamic = pd.DataFrame({'immediate': immediate_spot_standard, 'scheduled':scheduled_spot_standard, 'smart':smart_spot_standard})
 
-    pd_ToU_static_mean = pd.DataFrame({'immediate':immediate_mean_static, 'scheduled':scheduled_mean_static, 'smart':smart_mean_static})
-    pd_ToU_dynamic_mean = pd.DataFrame({'immediate': immediate_mean_ToU, 'scheduled':scheduled_mean_ToU, 'smart':smart_mean_ToU})
+    pd_ToU_static = pd.DataFrame({'immediate':immediate_mean_ToU, 'scheduled':scheduled_mean_ToU, 'smart':smart_mean_ToU})
+    pd_ToU_dynamic = pd.DataFrame({'immediate': immediate_spot_ToU, 'scheduled':scheduled_spot_ToU, 'smart':smart_spot_ToU})
+
 
     x = np.linspace(0, 2 * np.pi, 400)
     y = np.sin(x ** 2)
 
     fig_grouped_boxplots_cost_savings, axs = plt.subplots(2, 2, figsize=(15, 8))
-    #fig_grouped_boxplots_cost_savings.suptitle("Scenario: EV only")
+    fig_grouped_boxplots_cost_savings.suptitle("Scenario: EV only")
     
     # https://matplotlib.org/stable/gallery/statistics/boxplot.html
     meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black') #firebrick
     flierprops = dict(marker='o', markerfacecolor=(0,0,0,0.1), markersize=6, markeredgecolor=(0,0,0,1))
     
-    pd_ToU_static_mean.plot(ax = axs[0, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    pd_ToU_dynamic_mean.plot(ax = axs[0, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    pd_ToU_static_spot.plot(ax = axs[1, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    pd_ToU_dynamic_spot.plot(ax = axs[1, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_standard_static.plot(ax = axs[0, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_standard_dynamic.plot(ax = axs[0, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_ToU_static.plot(ax = axs[1, 0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    pd_ToU_dynamic.plot(ax = axs[1, 1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
     
-    axs[1, 0].set_xlabel("Static", fontsize=20)
-    axs[1, 1].set_xlabel("Dynamic", fontsize=20)
-    axs[0, 0].set_ylabel("Standard", fontsize=20)
-    axs[1, 0].set_ylabel("Time of Use", fontsize=20)
+    axs[1, 0].set_xlabel("Static", fontsize=20, fontweight='bold')
+    axs[1, 1].set_xlabel("Dynamic", fontsize=20, fontweight='bold')
+    axs[0, 0].set_ylabel("Standard", fontsize=20, fontweight='bold')
+    axs[1, 0].set_ylabel("Time of Use", fontsize=20, fontweight='bold')
     
     axs[1, 0].tick_params(axis='both', labelsize=20)
     axs[1, 1].tick_params(axis='both', labelsize=20)
     axs[0, 0].tick_params(axis='both', labelsize=20)
     axs[0, 1].tick_params(axis='both', labelsize=20)
 
-    axs[0, 0].set_ylim(0,1000)
-    axs[0, 1].set_ylim(0,1000)
-    axs[1, 0].set_ylim(0,1000)
-    axs[1, 1].set_ylim(0,1000)
+    axs[0, 0].set_ylim(0,600)
+    axs[0, 1].set_ylim(0,600)
+    axs[1, 0].set_ylim(0,600)
+    axs[1, 1].set_ylim(0,600)
 
-    ytickvals = np.array(range(0,11))*100
+    ytickvals = np.array(range(0,13))*50
 
     axs[0,0].set_yticks(ytickvals)
-    axs[0,0].set_yticklabels([str(y) if y%200==0 else " " for y in ytickvals], fontsize=20)
+    axs[0,0].set_yticklabels([str(y) if y%100==0 else " " for y in ytickvals], fontsize=20)
     axs[0,1].set_yticks(ytickvals)
-    axs[0,1].set_yticklabels([str(y) if y%200==0 else " " for y in ytickvals], fontsize=20)
+    axs[0,1].set_yticklabels([str(y) if y%100==0 else " " for y in ytickvals], fontsize=20)
     axs[1,0].set_yticks(ytickvals)
-    axs[1,0].set_yticklabels([str(y) if y%200==0 else " " for y in ytickvals], fontsize=20)
+    axs[1,0].set_yticklabels([str(y) if y%100==0 else " " for y in ytickvals], fontsize=20)
     axs[1,1].set_yticks(ytickvals)
-    axs[1,1].set_yticklabels([str(y) if y%200==0 else " " for y in ytickvals], fontsize=20)
+    axs[1,1].set_yticklabels([str(y) if y%100==0 else " " for y in ytickvals], fontsize=20)
 
     
-    fig_grouped_boxplots_cost_savings.supxlabel("Electricity price", fontsize=20)
-    fig_grouped_boxplots_cost_savings.supylabel("Network charge", fontsize=20)
+    fig_grouped_boxplots_cost_savings.supxlabel("Electricity price", fontsize=20, fontweight='bold')
+    fig_grouped_boxplots_cost_savings.supylabel("Network charge", fontsize=20, fontweight='bold')
 
     for ax in axs.flat:
         ax.xaxis.grid(False)
@@ -377,17 +401,18 @@ if (False): # PRICE COMPARISON
     
     
 
+epoch_time = datetime(1970, 1, 1)
 
 folder_str = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + r"\\"
     
 # files: immediate, scheduled, smart
-spot_only_charge_list = [folder_str + x for x in [r"2025-07-10_14-54_all_spot_immediate_charging_only_EV_r50_v10" + r"\\",
-                                            r"2025-07-10_11-32_all_spot_scheduled_charging_only_EV_r50_v10" + r"\\",
-                                            r"2025-07-10_11-37_all_spot_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
+spot_only_charge_list = [folder_str + x for x in [r"2025-07-17_08-59_all_spot_immediate_charging_only_EV_50_v10" + r"\\",
+                                            r"2025-07-17_09-58_all_spot_scheduled_charging_only_EV_r50_v10" + r"\\",
+                                            r"2025-07-17_08-09_all_spot_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
                                  
-mean_only_charge_list = [folder_str + x for x in [r"2025-07-09_22-11_all_mean_immediate_charging_only_EV_r50_v10" + r"\\",
-                                                          r"2025-07-10_00-59_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\",
-                                                          r"2025-07-10_01-00_all_mean_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
+mean_only_charge_list = [folder_str + x for x in [r"2025-07-17_11-59_all_mean_immediate_charging_only_EV_r50_v10" + r"\\",
+                                                          r"2025-07-17_16-20_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\",
+                                                          r"2025-07-17_11-58_all_mean_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
 
 charge_mode = ["immediate", "scheduled", "smart"]
 
@@ -429,32 +454,38 @@ if (False):
     fig_kw_savings, axs_kw_savings = plt.subplots(ncols=2, figsize=(15, 6))   
 
     # linker plot
-    pd_charge_mode = pd.concat([ pd_day["immediate_mean_static_standard"] - pd_day["immediate_mean_static_standard"],
+    pd_charge_mode = pd.concat([ pd_day["immediate_mean_static_standard"] - pd_day["immediate_mean_static_standard"], # alle immediate (spot, mean, ToU, standard) müssten gleich sein !!!!!
                                     pd_day["scheduled_mean_static_standard"] - pd_day["immediate_mean_static_standard"],
                                     pd_day["smart_mean_static_standard"] - pd_day["immediate_mean_static_standard"],
-                                    pd_day["immediate_spot_static_standard"] - pd_day["immediate_spot_static_standard"],
-                                    pd_day["scheduled_spot_static_standard"] - pd_day["immediate_spot_static_standard"],
-                                    pd_day["smart_spot_static_standard"] - pd_day["immediate_spot_static_standard"] ],
+                                    pd_day["smart_mean_ToU_standard"] - pd_day["immediate_mean_static_standard"],
+                                    pd_day["smart_spot_static_standard"] - pd_day["immediate_mean_static_standard"],
+                                    pd_day["smart_spot_ToU_standard"] - pd_day["immediate_mean_static_standard"] ],
                                     
-                                    axis = 1).rename(columns={"immediate_mean_static_standard":"reference static immediate", 0:"switch to scheduled (static)", 1:"switch to smart (static)", 
-                                                              "immediate_spot_static_standard":"reference:\ndynamic immediate", 2:"switch to scheduled (dynamic)", 3:"switch to smart (dynamic)" })
+                                    axis = 1).rename(columns={"immediate_mean_static_standard":"reference: immediate", 0:"switch to scheduled", 
+                                                              1:"switch to smart (static, standard)", 2:"switch to smart (static, ToU)",
+                                                              3:"switch to smart (dynamic, standard)", 4:"switch to smart (dynamic, ToU)" })
 
 
 
-    axs_kw_savings[0].plot(pd_charge_mode["reference static immediate"], linestyle="--", color="k", linewidth=1, zorder=2, label="reference: immediate \n(static, dynamic)")
-                                                              
-    #axs_kw_savings[0].plot(pd_charge_mode["reference static immediate"], linestyle=":", color="#8b3003", linewidth=1, zorder=2, label="reference: \nstatic immediate")
-    axs_kw_savings[0].plot(pd_charge_mode["switch to scheduled (static)"], linestyle="-", color="k", linewidth=1, zorder=2, label="switch to scheduled \n(static, dynamic)")
-    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (static)"], linestyle="-", color="#c13f1a", linewidth=1, zorder=1, label="switch to smart (static)")
+    axs_kw_savings[0].plot(pd_charge_mode["reference: immediate"], linestyle="--", color="k", linewidth=1, zorder=2, label="reference: immediate")
+    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (static, standard)"], linestyle="--", color="#8b3003", linewidth=1, zorder=1, label= r'$\rightarrow$' + "smart (static, standard)")
+    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (static, ToU)"], linestyle="-", color="#c13f1a", linewidth=1, zorder=1, label= r'$\rightarrow$' + "smart (static, ToU)")
+
+    axs_kw_savings[0].plot(pd_charge_mode["switch to scheduled"], linestyle="-", color="k", linewidth=1, zorder=2, label= r'$\rightarrow$' + "scheduled")
+    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (dynamic, standard)"], linestyle="--", color="#00386c", linewidth=1, zorder=1, label= r'$\rightarrow$' + "smart (dynamic, standard)")
+    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (dynamic, ToU)"], linestyle="-", color="#0087ff", linewidth=1, zorder=1, label= r'$\rightarrow$' + "smart (dynamic, ToU)")
+
+
 
     #axs_kw_savings[0].plot(pd_charge_mode["switch to scheduled (dynamic)"], linestyle="--", color="#00386c", linewidth=1, zorder=1, label="switch to scheduled (dynamic)")
-    axs_kw_savings[0].plot(pd_charge_mode["switch to smart (dynamic)"], linestyle="-", color="#0087ff", linewidth=1, zorder=1, label="switch to smart (dynamic)")
+    #axs_kw_savings[0].plot(pd_charge_mode["switch to smart (dynamic)"], linestyle="-", color="#0087ff", linewidth=1, zorder=1, label= r'$\rightarrow$' + " smart (dynamic)")
 
-    axs_kw_savings[0].legend(fontsize=16, loc="upper right")
+    axs_kw_savings[0].legend(fontsize=11, ncols=2, loc="upper center", title="Impact of charge strategy", title_fontsize=16)
     axs_kw_savings[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
     axs_kw_savings[0].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
     axs_kw_savings[0].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
-    axs_kw_savings[0].set_ylabel("Mean Power reduction \n through charge strategy in kW", fontsize=20)
+    axs_kw_savings[0].set_ylim(-0.2, 0.32)
+    axs_kw_savings[0].set_ylabel("Mean Power reduction in kW", fontsize=20)
     axs_kw_savings[0].tick_params(axis='y', labelsize=20)
     axs_kw_savings[0].set_xlabel("Time in hours", fontsize=20)
 
@@ -471,19 +502,20 @@ if (False):
     color_list = ["#8b3003", "#c13f1a", "#00386c", "#0087ff"]
     
     #axs_kw_savings[1].fill_between(np.array(range(0,96))/4, pd_smart["static ToU"], linestyle=linestyle_list[1], color=color_list[1], alpha=0.5, zorder=0)
-    axs_kw_savings[1].plot(pd_smart["reference: static standard"], linestyle=linestyle_list[0], color=color_list[0], alpha=1, linewidth=1,  zorder=2, label="reference: smart \nstatic standard")
-    axs_kw_savings[1].plot(pd_smart["static ToU"], linestyle=linestyle_list[1], color=color_list[1], alpha=1, zorder=0, linewidth=1, label="static ToU")
+    axs_kw_savings[1].plot(pd_smart["reference: static standard"], linestyle=linestyle_list[0], color=color_list[0], alpha=1, linewidth=1,  zorder=2, label="reference: \nstatic standard")
+    axs_kw_savings[1].plot(pd_smart["static ToU"], linestyle=linestyle_list[1], color=color_list[1], alpha=1, zorder=0, linewidth=1, label=r'$\rightarrow$' +"static ToU")
 
     #axs_kw_savings[1].fill_between(np.array(range(0,96))/4, pd_smart["dynamic standard"], pd_smart["dynamic ToU"], linestyle=linestyle_list[2], color=color_list[2], alpha=0.5, zorder=0)
-    axs_kw_savings[1].plot(pd_smart["dynamic standard"], linestyle=linestyle_list[2], color=color_list[2], alpha=1, zorder=1, linewidth=1, label="dynamic standard")
-    axs_kw_savings[1].plot(pd_smart["dynamic ToU"], linestyle=linestyle_list[3], color=color_list[3], alpha=1, linewidth=1,  zorder=3, label="dynamic ToU")
+    axs_kw_savings[1].plot(pd_smart["dynamic standard"], linestyle=linestyle_list[2], color=color_list[2], alpha=1, zorder=1, linewidth=1, label=r'$\rightarrow$' +"dynamic standard")
+    axs_kw_savings[1].plot(pd_smart["dynamic ToU"], linestyle=linestyle_list[3], color=color_list[3], alpha=1, linewidth=1,  zorder=3, label=r'$\rightarrow$' +"dynamic ToU")
 
-    axs_kw_savings[1].legend(fontsize=16)
+    axs_kw_savings[1].legend(fontsize=11, ncols=2, title="Impact of tariff components", title_fontsize=16, loc="upper center")
+
         
     axs_kw_savings[1].set_ylim(y_min, y_max)
     axs_kw_savings[1].set_xlabel("Time in hours", fontsize=20)
-    axs_kw_savings[1].set_ylabel("Mean Power reduction \n for smart charging tariffs in kW", fontsize=20)
-    axs_kw_savings[1].set_ylim(-0.2, 0.6)
+    axs_kw_savings[1].set_ylabel("Mean Power reduction in kW", fontsize=20)
+    axs_kw_savings[1].set_ylim(-0.2, 0.32)
     axs_kw_savings[1].tick_params(axis='y', labelsize=20)
     axs_kw_savings[1].set_xlim(0, 24)
     axs_kw_savings[1].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))

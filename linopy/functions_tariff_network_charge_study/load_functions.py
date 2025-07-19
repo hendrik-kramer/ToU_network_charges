@@ -33,6 +33,10 @@ def load_timesteps(input_year):
     timesteps["TimeString"] = timesteps["DateTime"].dt.strftime('%H:%M:%S')
     timesteps["DateString"] = timesteps["DateTime"].dt.strftime('%Y-%m-%d')
     
+    timesteps["isoyear"] = timesteps["DateTime"].dt.isocalendar().year
+    timesteps = timesteps[ timesteps["isoyear"]  == input_year]
+    timesteps = timesteps.drop(columns=["isoyear"])
+    
     epoch_time = datetime.datetime(1970, 1, 1)
     timesteps_utc = timesteps["DateTime"].dt.tz_convert("UTC").dt.tz_convert(None)
     timesteps["seconds_since_1970_in_utc"] = (timesteps_utc - epoch_time).dt.total_seconds() 
@@ -68,6 +72,8 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
         price_data = price_data.rename(columns={"Value":"spot_cost"})
         price_data["Time_String"] = pd.to_datetime(price_data["DateTime"]).dt.tz_localize(None).dt.strftime("%H:%M:%S").astype(str)
             
+        price_data= price_data[raw_price_data['iso_year'] == input_year]
+        
         price_data = price_data.rename(columns={"DateTime":"t"}).set_index("t", drop=True)
         price_data_xr = xr.DataArray(price_data["spot_cost"])
         prices_xr = price_data_xr.astype(float)

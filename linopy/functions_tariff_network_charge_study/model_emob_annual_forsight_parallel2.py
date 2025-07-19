@@ -23,34 +23,9 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     
     warnings.simplefilter(action='ignore', category=FutureWarning)  
     warnings.simplefilter(action='ignore', category=UserWarning)      
-    
-    # initialize rolling planning timestep ranges
-    #if parameters_opti["rolling_window"] == "day":
-    #    unique_days = timesteps["DateTime"].dt.date.unique()
-    #    rolling_timesteps = []
-    #    for ct_day in unique_days:
-    #        day_min_idx = timesteps[timesteps["DateTime"].dt.date == ct_day].index.min()
-    #        day_max_idx = timesteps[timesteps["DateTime"].dt.date == ct_day].index.max()
-    #        rolling_timesteps.append( range(day_min_idx, day_max_idx))
-    #        #[len(ct) for ct in daily_timesteps]
-    
-  
-    
-    # get sub xarrays
-    #ct_rolling = timesteps.index
-    #spot_prices_xr = spot_prices_xr.isel(t=ct_rolling)
-    #network_charges_xr = network_charges_xr.isel(t=ct_rolling)
-    #emob_demand_xr = emob_demand_xr.isel(t=ct_rolling)
-    #emob_state_xr = emob_state_xr.isel(t=ct_rolling)
-    #emob_departure_times = emob_departure_times.iloc[emob_subset]
-    
-    # get dictionary for preferred/most often departure times
-    #ct_rolling_datetime = timesteps["DateTime"].dt.time.to_numpy()
-    #for key in dict_idx_lookup:
-    #    dict_idx_lookup[key] = dt.time(dict_idx_lookup[key][dict_idx_lookup[key].isin(ct_rolling_datetime)])
-        #dict_idx_lookup[key] = dict_idx_lookup[ct_ev][dict_idx_lookup[ct_ev].isin(time_subset)] for ct_ev in dict_idx_lookup]
-    
-    #irradiance_xr = irradiance_xr.isel(t=ct_rolling)
+
+
+
 
     emob_home_xr = (emob_state_xr=="home")
     emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean(dim="t")).drop_vars("s")
@@ -150,7 +125,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
     # penalize if below preference
     cons_violation_preference  = m.add_constraints(SOC_EV + SOC_BELOW_PREF >= parameters["ev_soc_preference"] * parameters["ev_soc_max"], name='cons_preference_violation')
-    
+
     
     # PENALTY
     cons_violation_charge_only_home  = m.add_constraints(P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_violation_charge_only_home')
@@ -170,9 +145,22 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     
     # zu minimierende Zielfunktion
     if parameters_opti["settings_obj_fnct"] == "immediate_charging":
-        obj = 99 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum() 
+        
+        # create linrange for temporal preference
+        timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
+        timepref_xr = xr.DataArray(timepref_pd["timepref"])
+        obj = (timepref_xr * P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
+    
     elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        obj = 99 * SOC_BELOW_PREF.sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum() #+ 999*SOC_MISSING.sum() 
+        # create linrange for temporal preference
+        timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
+        timepref_xr = xr.DataArray(timepref_pd["timepref"])
+        obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
+    
+    elif parameters_opti["settings_obj_fnct"] == "partfill_charging":
+        obj = 10 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() #+ 999*SOC_MISSING.sum() 
+   
+
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
         obj = C_OP_ALL.sum() #+   999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum()
       
@@ -186,16 +174,3 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
 
 
-
-    
-    #cons_hp_min = m.add_constraints(P_HP - P_HP_slack >= 0, name='power_hp_min')
-    #cons_hp_max = m.add_constraints(P_HP - P_HP_slack <= p_hp, name='power_hp_max')
-    #cons_stor_max = m.add_constraints(E_HStor <= e_max, name='max_soc')
-    #cons_stor_exchange = m.add_constraints(E_HStor.isel(t=range(1,len(set_time)-1)) == E_HStor.isel(t=range(0,len(set_time)-2)) + P_HStor.isel(t=range(0,len(set_time)-2)) * timesteplength, name='system_balance')
-    #cons_stor_fix_last = m.add_constraints(P_HStor.isel(t=-1) == 0, name='p_hstor_fix_last_entry')
-    # NO CIRCLE IN ROLLING HORIZON!: cons_stor_circle = m.add_constraints(E_HStor.isel(t=0) == E_HStor.isel(t=-2), name='power_hp_circle')
-    #cons_demand_balance = m.add_constraints(cop * P_HP - P_HStor - heat_demand_xr == 0, name='demand_balance')
-    
-    #cons_stor_exchange_max = m.add_constraints(P_HStor <= 1, name='cons_stor_exchange_max')
-    #cons_stor_exchange_min = m.add_constraints(P_HStor >= -1, name='cons_stor_exchange_min')
-    
