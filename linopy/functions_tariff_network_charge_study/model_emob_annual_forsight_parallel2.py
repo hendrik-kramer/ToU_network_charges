@@ -53,8 +53,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     SOC_EV = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='SOC_EV', lower=0) # EV battery state of charge
     P_EV = m.add_variables(coords=[set_time,set_dso, set_vehicle, set_setup], name='P_EV', lower=0) # EV charge power
     P_BUY = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_BUY', lower=0) # EV Mobility
+    
     if parameters_opti["settings_setup"] == "prosumage":
-        #BIN_IN = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='BIN_IN', binary=True) # EV Mobility
         P_DCH = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_DCH', lower=0) # EV Mobility
         P_CH = m.add_variables(coords=[set_time, set_dso, set_vehicle, set_setup], name='P_CH', lower=0) # EV Mobility
         P_PV = m.add_variables(coords=[set_time, set_dso, set_region, set_setup], name='P_PV', lower=0) # EV Mobility
@@ -111,8 +111,6 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
          cons_pv_p_max = m.add_constraints(P_PV <= (irradiance_xr * parameters["pv_p_max"]), name='cons_pv_p_max')
 
-    #if parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-    #    cons_no_HT_charge = m.add_constraints(P_BUY <= emob_HT_xr * 999, name='cons_no_HT_charge')      # NOT NICE
 
 
     # Home Balance
@@ -158,11 +156,11 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
         obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
     
     elif parameters_opti["settings_obj_fnct"] == "partfill_charging":
-        obj = 10 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() #+ 999*SOC_MISSING.sum() 
+        obj = 10 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum()
    
 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = C_OP_ALL.sum() #+   999999 * P_EV_NOT_HOME.sum() # + 999*SOC_MISSING.sum()
+        obj = C_OP_ALL.sum() +   999999 * P_EV_NOT_HOME.sum()
       
     m.add_objective(obj)
     

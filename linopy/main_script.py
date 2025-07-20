@@ -35,11 +35,11 @@ parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "auction": "da_auction_hourly_12_uhr_linInterpol",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
-    "prices": "spot", # "spot", "mean"
-    "settings_obj_fnct": "smart_charging", # "immediate_charging", # "scheduled_charging" "partfill_charging" "smart_charging"
+    "prices": "mean", # "spot", "mean"
+    "settings_obj_fnct": "immediate_charging", # "immediate_charging", # "scheduled_charging" "partfill_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
-    "dso_subset" : range(0,50), # excel read in only consideres 100 rows!
+    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,10),
     "tso_subset" : range(4,5),
     }
@@ -49,7 +49,7 @@ parameters_model = {
     "ev_soc_max": 70, # kWh
     "ev_soc_init_rel": 0.9, # %
     "ev_soc_preference": 1, # %
-    "ev_soc_departure": 0.95, # %
+    "ev_soc_departure": 1, # %
     "ev_p_charge_not_home": 22, # kW
     "ev_eta_in": 0.95,
     "ev_losses": 0.0001,

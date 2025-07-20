@@ -149,8 +149,12 @@ if (False): # PEAK REDUCTION HEATMAP
     fig_kw_reduction.savefig(folder_path / "peak_reduction_savings.svg")
     
     
+# =============================================================================
+# Total Cost for scheduled and smart charging // Annual cost savings end-consumer
+# =============================================================================
+   
     
-if (False): # Total Cost for scheduled and smart charging // Annual cost savings end-consumer
+if (False): 
     
     # pfade scheduled
     # network charge _ elec
@@ -264,142 +268,13 @@ if (False): # Total Cost for scheduled and smart charging // Annual cost savings
 
     
     
-if (False): # PRICE COMPARISON
-
-    # Dynamic price minus Average price of rolling period (15 pm to 15pm next day) 
-    
-    dso_col = "EWE NETZ"
-    
-        
-    ude_colors_inv = ['#004c93', 'white', '#8b2d0d'] # blau weiß rot   #sand  #efe4bf'
-    cmap_ude_inv = mcolors.LinearSegmentedColormap.from_list('ude_inv', ude_colors_inv)
-    
-    time_index = spot_prices_xr["t"].to_pandas().index.hour
-    #time_index_evening = ((time_index >= 17) & (time_index <= 21))
-
-    signal = pd.DataFrame([spot_prices_xr.to_pandas()]).transpose().rename(columns={0:"value"})
-    signal["Date"] = signal.index.strftime("%Y-%m-%d")
-    signal["Time"] = signal.index.strftime("%H_%M")
-
-    signal_spot_pivot = pd.pivot_table(signal, index=signal.Date, columns=signal.Time, values="value")
-    col_names  = [a + "+1" for a in signal_pivot.columns[0:15*4]]
-
-    signal_spot_15_15 = pd.merge(signal_pivot, pd.DataFrame(signal_spot_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_spot_pivot.index), left_index=True, right_index=True)
-    signal_spot_15_15 = signal_spot_15_15.iloc[:,15*4:]
-
-    daily_mean_spot_price = signal_spot_15_15.mean(axis=1)
-    rel_signal_spot_15_15 = signal_spot_15_15.sub(daily_mean_spot_price, axis=0)
-    
-    # networrk charges
-    network_charge_reduction = (network_charges_xr.sel(s="red")-network_charges_xr.sel(s="reg")).to_pandas()
-    network_charge_reduction["Date"] = signal.index.strftime("%Y-%m-%d")
-    network_charge_reduction["Time"] = signal.index.strftime("%H_%M")
-    
-    signal_nc_pivot = pd.pivot_table(network_charge_reduction, index=network_charge_reduction.Date, columns=network_charge_reduction.Time, values=dso_col)
-    signal_nc_15_15 = pd.merge(signal_nc_pivot, pd.DataFrame(signal_nc_pivot.iloc[:,0:15*4].shift(-1).to_numpy(), columns=col_names, index=signal_nc_pivot.index), left_index=True, right_index=True)
-    signal_nc_15_15 = signal_nc_15_15.iloc[:,15*4:]
-   
-    fig_signal, axes_signal = plt.subplots(nrows=1, ncols=3, figsize=(15, 4))
-
-    heatmap_spot = axes_signal[0].imshow(rel_signal_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
-    axes_signal[0].set_title("Spot price minus mean daily spot price")
-    plt.xlabel('Hour')
-    plt.ylabel('Day')
-    axes_signal[0].set_xticks(range(0,96,4), rel_signal_15_15.columns[range(0,96,4)], rotation=90)
-    axes_signal[0].set_yticks(range(0,len(rel_signal_15_15)), rel_signal_15_15.index, rotation=0)
-    fig_kw_reduction.colorbar(heatmap_spot, ax=axes_signal[0],  orientation="vertical", extend="both")
-
-    heatmap_nc = axes_signal[1].imshow(signal_nc_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
-    axes_signal[1].set_title("+ ToU network charge minus regular network charge")
-    plt.xlabel('Hour')
-    plt.ylabel('Day')
-    axes_signal[1].set_xticks(range(0,96,4), signal_nc_15_15.columns[range(0,96,4)], rotation=90)
-    axes_signal[1].set_yticks(range(0,len(signal_nc_15_15)), signal_nc_15_15.index, rotation=0)
-    fig_kw_reduction.colorbar(heatmap_nc, ax=axes_signal[1],  orientation="vertical", extend="both")
-
-
-    heatmap_signal = axes_signal[2].imshow(signal_nc_15_15+rel_signal_15_15, cmap=cmap_ude_inv, aspect=2, vmin=-15, vmax=15)
-    axes_signal[2].set_title("= Network charge and spot signal added")
-    plt.xlabel('Hour')
-    plt.ylabel('Day')
-    axes_signal[2].set_xticks(range(0,96,4), signal_nc_15_15.columns[range(0,96,4)], rotation=90)
-    axes_signal[2].set_yticks(range(0,len(signal_nc_15_15)), signal_nc_15_15.index, rotation=0)
-    fig_kw_reduction.colorbar(heatmap_signal, ax=axes_signal[2],  orientation="vertical", extend="both")
-
 
 
     
 # =============================================================================
-# if (False): # CHARGE POWER 
-# 
-# 
-#     def plot_clustered_stacked(dfall, labels=None, title="multiple stacked bar plot",  H=".", **kwargs):
-#         """Given a list of dataframes, with identical columns and index, create a clustered stacked bar plot. 
-#     labels is a list of the names of the dataframe, used for the legend
-#     title is a string for the title of the plot
-#     H is the hatch used for identification of the different dataframe"""
-#         import matplotlib as mpl
-#         from cycler import cycler
-#         mpl.rcParams["axes.prop_cycle"] = cycler('color', ["#efe4bf", "#004c93"])
-#     
-#         n_df = len(dfall)
-#         n_col = len(dfall[0].columns) 
-#         n_ind = len(dfall[0].index)
-#         axe = plt.subplot(111)
-#         plt.subplots_adjust(bottom=0.476,left=0.057,right=0.917,top=0.9)
-#         
-#         for df in dfall : # for each data frame
-#             axe = df.plot(kind="bar",
-#                           edgecolor="black",
-#                           linewidth=1,
-#                           stacked=True,
-#                           ax=axe,
-#                           legend=False,
-#                           grid=False,
-#                           **kwargs)  # make bar plots
-#     
-#         h,l = axe.get_legend_handles_labels() # get the handles we want to modify
-#         for i in range(0, n_df * n_col, n_col): # len(h) = n_col * n_df
-#             for j, pa in enumerate(h[i:i+n_col]):
-#                 for rect in pa.patches: # for each index
-#                     rect.set_x(rect.get_x() + 1 / float(n_df + 1) * i / float(n_col))
-#                     #rect.set_color(colors_plot[j,int(np.floor(i/n_df))])
-#                     #print(int(i / n_col))
-#                     rect.set_hatch(H * int(i / n_col)) #edited part     
-#                     rect.set_width(1 / float(n_df + 1))
-#                     #print(int(np.floor(i/n_df)),j)
-#     
-#         axe.set_xticks((np.arange(0, 2 * n_ind, 2) + 1 / float(n_df + 1)) / 2.)
-#         axe.set_xticklabels(df.index, rotation = 90)
-#         axe.set_title(title)
-#     
-#         # Add invisible data to add another legend
-#         n=[]        
-#         for i in range(n_df):
-#             n.append(axe.bar(0, 0, color="#eeeeee", hatch=H * i))
-#     
-#         l1 = axe.legend(h[:n_col], l[:n_col], loc="upper left", ncol=2) #[1.01, 0.5]
-#         if labels is not None:
-#             l2 = plt.legend(n, labels,  loc="upper right", ncol=2) # loc=[1.01, 0.1],
-#         axe.add_artist(l1)
-#         
-#         # background grid lines
-#         axe.grid(color='lightgray', linestyle='--', linewidth=1, axis="y")
-#         axe.set_axisbelow(True)
-#         axe.set_ylim([0, 1.3*max(df_reg.max().max(), df_red.max().max())])
-#         #axe.subplots_adjust(bottom=0.2)
-#         return axe
-# 
-#     
-#     df_reg = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="reg").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="reg").sum("t").mean("v")}, index=result_P_BUY["r"] )
-#     df_red = pd.DataFrame( {"P_BUY":result_P_BUY.sel(s="red").sum("t").mean("v"), "P_EV_NOT_HOME":result_P_EV_NOT_HOME.sel(s="red").sum("t").mean("v")}, index=result_P_BUY["r"] )
-# 
-#     plot_clustered_stacked([df_reg, df_red],["regular network charges", "reduced network charges"], title="Energy consumed in kWh")
-# 
-#     fig.savefig(folder_path / "dso_energy_barlot.svg")
+# CHARGE POWER 
 # =============================================================================
-    
-    
+
 
 epoch_time = datetime(1970, 1, 1)
 
@@ -414,10 +289,19 @@ mean_only_charge_list = [folder_str + x for x in [r"2025-07-17_11-59_all_mean_im
                                                           r"2025-07-17_16-20_all_mean_scheduled_charging_only_EV_r50_v10" + r"\\",
                                                           r"2025-07-17_11-58_all_mean_smart_charging_only_EV_r50_v10" + r"\\"  ]  ]
 
+
+spot_only_charge_list = [folder_str + x for x in [r"2025-07-19_17-51_all_spot_immediate_charging_only_EV_r10_v10" + r"\\",
+                                            r"2025-07-19_18-29_all_spot_scheduled_charging_only_EV_r10_v10" + r"\\",
+                                            r"2025-07-19_19-07_all_spot_smart_charging_only_EV_r10_v10" + r"\\"  ]  ]
+                                 
+mean_only_charge_list = [folder_str + x for x in [r"2025-07-19_13-23_all_mean_immediate_charging_only_EV_r10_v10" + r"\\",
+                                                          r"2025-07-19_14-19_all_mean_scheduled_charging_only_EV_r10_v10" + r"\\",
+                                                          r"2025-07-19_14-54_all_mean_smart_charging_only_EV_r10_v10" + r"\\"  ]  ]
+
+
+
 charge_mode = ["immediate", "scheduled", "smart"]
 
-fig_kW_reduction, axs_kW_reduction = plt.subplots(ncols=3, figsize=(15, 4))  # 3 subplots horizontally  
-y_min, y_max = -0.4, 0.4
 
 
 pd_ct = pd.DataFrame()
@@ -437,7 +321,7 @@ for ct in range(0, len(mean_only_charge_list)):
     pd_ct[charge_mode[ct] + "_spot_static_standard"] = spot_static
     pd_ct[charge_mode[ct] + "_spot_ToU_standard"] = spot_ToU
     
-dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(spot_only_charge + "P_BUY.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(mean_only_charge + "P_BUY.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
 pd_ct = pd_ct.set_index(dti)
 pd_ct["hour decimal"] = pd_ct.index.hour + pd_ct.index.minute/60
 
@@ -484,7 +368,7 @@ if (False):
     axs_kw_savings[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
     axs_kw_savings[0].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
     axs_kw_savings[0].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
-    axs_kw_savings[0].set_ylim(-0.2, 0.32)
+    axs_kw_savings[0].set_ylim(-1, 2)
     axs_kw_savings[0].set_ylabel("Mean Power reduction in kW", fontsize=20)
     axs_kw_savings[0].tick_params(axis='y', labelsize=20)
     axs_kw_savings[0].set_xlabel("Time in hours", fontsize=20)
@@ -515,7 +399,7 @@ if (False):
     axs_kw_savings[1].set_ylim(y_min, y_max)
     axs_kw_savings[1].set_xlabel("Time in hours", fontsize=20)
     axs_kw_savings[1].set_ylabel("Mean Power reduction in kW", fontsize=20)
-    axs_kw_savings[1].set_ylim(-0.2, 0.32)
+    axs_kw_savings[1].set_ylim(-1, 2)
     axs_kw_savings[1].tick_params(axis='y', labelsize=20)
     axs_kw_savings[1].set_xlim(0, 24)
     axs_kw_savings[1].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
@@ -532,110 +416,4 @@ if (False):
 
 
 
-
-
-
-if (True): # EV SOC
-    pd_res = result_SOC_EV.isel(v=1, r=1).to_pandas()
-    plt.figure()
-    plt.plot(pd_res)
-    plt.legend(pd_res.columns)
-    plt.ylabel("SOC EV in kWh")
-    plt.show()
-
-
-if (True) and parameters_model["settings_setup"] == "prosumage": # P_PV
-    plt.figure()
-    plt.plot(result_P_PV)
-    plt.legend(result_P_PV.columns)
-    plt.ylabel("P PV in kW")
-    plt.show()
-
-    
-if (True) and parameters_model["settings_setup"] == "prosumage": # BESS SOC
-    plt.figure()
-    plt.plot(result_SOC_BESS.isel(v=1,r=1))
-    plt.legend(result_SOC_BESS.columns)
-    plt.ylabel("SOC BESS in kWh")
-    plt.show()
-
-
-if (False): # P_BUY
-    plt.figure()
-    plt.plot(result_P_BUY)
-    plt.legend(result_P_BUY.columns)
-    plt.show()
-
-
-if (False):
-    # quantile plot of EV over all regions
-    fig1, ax1 = plt.subplots()
-    for quantile in [0.0, 0.1, 0.2, 0.3, 0.4]:
-        ax1.fill_between(result_SOC_EV.isel(v=1,s=1).to_pandas().index,
-                        result_SOC_EV.isel(v=1,s=1).to_pandas().reset_index().set_index("t").quantile(axis=1, q=quantile),
-                        result_SOC_EV.isel(v=1,s=1).to_pandas().reset_index().set_index("t").quantile(axis=1, q=1-quantile),
-                        color='b', alpha= quantile + 0.3, edgecolor=None)
-    ax1.plot(result_SOC_EV.isel(v=1,s=1).to_pandas().reset_index().set_index("t").median(axis=1), color="k", linewidth=1)
-    plt.show()
-
-
-
-    buy_scatter = m["P_BUY"].solution.isel(r=1, v=1).to_pandas().rename(columns={"red":"red_buy", "reg":"reg_buy"}).reset_index()
-    cost_pd = cost_xr.isel(r=1).to_pandas().reset_index().rename(columns={"red":"red_spot", "reg":"reg_spot"}).reset_index()
-    
-    merge_result = buy_scatter.merge(cost_pd)
-    merge_result["time_of_day"] = merge_result.t.dt.hour + merge_result.t.dt.minute/60
-    merge_result = merge_result[merge_result["reg_buy"] > 0 ]
-    merge_result["marker_size"] = 25 * merge_result["reg_buy"]
-    
-
-    fig, ax = plt.subplots(1, 1)
-    merge_result.plot.scatter(x='time_of_day',y='reg_spot', s="marker_size", alpha=0.3, xlabel="Time of the day", ylabel="charge price", ax=ax, c="blue", legend="regular")
-    merge_result.plot.scatter(x='time_of_day',y='red_spot', s="marker_size", alpha=0.3, xlabel="Time of the day", ylabel="charge price", ax=ax, c="orange", legend="reduced")
-    ax.legend(["regular", "reduced"])
-
-
-
-
-
-# ====== DEDUCE HEAT PUMP DEMAND FROM TEMPERATURE ======
-
-
-#alpha = 0.0025  # W/(m^2*K)
-#surface = 200 #m^2
-#limit_temp = 15 # °C
-
-#heat_demand = alpha * surface * np.maximum(limit_temp-temperature_cut, 0) 
-#heat_demand_xr = xr.DataArray(heat_demand, dims='t')
-
-
-#if (False):
-#    plt.plot(heat_demand)
-
-
-
-# ====== Heat pump parameters =====
-#e_max = 20  # kWh
-#p_hp = 4 # kW
-#cop = 3 # [-]
-#timesteplength = 1 # h
-
-# ===== optimization model =====
-
-
-#m_perf_foresight_det = model_perf_forsight.build_hp_model(prices, dsos, prices_xr, e_max, p_hp, cop, heat_demand_xr, penalty, timesteplength)
-
-#e_init_percent = 0.6
-#e_min_end_percent = 0.8
-
-
-
-
-# plots
-#if (False):
-#    result_P_HP.iloc[1:671,:].plot(style=["-","--"], color=["r","k"], ylabel="power in kW", xlabel="time")
-
-
-#if (False):
-#    result_E_HStor.iloc[1:671,:].plot(style=["-","--"], color=["r","k"], ylabel="energy in kWh", xlabel="time")
 
