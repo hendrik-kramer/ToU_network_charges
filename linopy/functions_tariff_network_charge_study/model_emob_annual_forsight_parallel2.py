@@ -81,6 +81,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     cons_ev_charge_ev_max = m.add_constraints(P_EV <= emob_home_xr * parameters["ev_p_charge_home"], name='cons_ev_charge_home')
     cons_ev_charge_not_home = m.add_constraints(P_EV_NOT_HOME <= parameters["ev_p_charge_not_home"], name='cons_ev_charge_not_home')
 
+    # update from previous rolling planning timeframe
     cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == parameters["ev_soc_init_abs"], name='cons_ev_init')
 
 
@@ -149,18 +150,24 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
         timepref_xr = xr.DataArray(timepref_pd["timepref"])
         obj = (timepref_xr * P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
     
+    
     elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
         # create linrange for temporal preference
         timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
         timepref_xr = xr.DataArray(timepref_pd["timepref"])
         obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
+
     
-    elif parameters_opti["settings_obj_fnct"] == "partfill_charging":
-        obj = 10 * SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum()
-   
+    elif parameters_opti["settings_obj_fnct"] == "partfill_immediate_charging":
+        obj = SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum()
+        
+        
+    elif parameters_opti["settings_obj_fnct"] == "partfill_scheduled_charging":
+        obj = SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() + 999999999*(emob_HT_xr*P_BUY).sum()
+            
 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = C_OP_ALL.sum() +   999999 * P_EV_NOT_HOME.sum()
+        obj = C_OP_ALL.sum() # + 999999 * P_EV_NOT_HOME.sum()
       
     m.add_objective(obj)
     
