@@ -118,7 +118,7 @@ all_prices['iso_year'] = all_prices['Time_DE'].dt.isocalendar().year
 all_prices['iso_week'] = all_prices['Time_DE'].dt.isocalendar().week
 all_prices["Delivery day"] = pd.to_datetime(all_prices['Time_DE'].dt.date).astype(str)
 all_prices["time"] = all_prices['Time_DE'].dt.time.astype(str)
-all_prices = all_prices[(all_prices["Time_DE"].dt.year>=2018) & (all_prices["Time_DE"].dt.year<=2024)] # always all years
+all_prices = all_prices[(all_prices["Time_DE"].dt.isocalendar().year>=2018) & (all_prices["Time_DE"].dt.isocalendar().year<=2024)] # always all years
 all_prices_pivot = all_prices.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
 
 # put evening hours up front
@@ -262,6 +262,16 @@ cbar.ax.tick_params(labelsize=my_fontsize)
 ax_ssc.hlines(y=[0], xmin=-xx, xmax=xx, colors=['gray'], linestyles=['--'], linewidth=2, zorder=2)
 ax_ssc.vlines(x=[0], ymin=-yy, ymax=yy, colors=['gray'], linestyles=['--'], linewidth=2, zorder=2)
 ax_ssc.axline([-yy, -yy], [yy, yy], color="gray", linestyle="--", linewidth=2)
+ax_ssc.axline([yy, -yy], [-yy, yy], color="gray", linestyle="--", linewidth=2)
+
+ax_ssc.annotate("I",(-22.8, 11.5), fontsize=16)
+ax_ssc.annotate("II",(-7.5, 11.5), fontsize=16)
+ax_ssc.annotate("III",(7.2, 11.5), fontsize=16)
+ax_ssc.annotate("IV",(22.2, 11.5), fontsize=16)
+ax_ssc.annotate("V",(-23, -12), fontsize=16)
+ax_ssc.annotate("VI",(-7.5, -12), fontsize=16)
+ax_ssc.annotate("VII",(7.0, -12), fontsize=16)
+ax_ssc.annotate("VIII",(20.5, -12), fontsize=16)
 
 
 # Change major ticks to show every 20.
