@@ -34,13 +34,13 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
-    "auction": "da_auction_hourly_12_uhr_linInterpol",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
+    "auction": "da_auction_hourly_12_uhr_stairs",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "prices": "mean", # "spot", "mean"
-    "settings_obj_fnct": "immediate_charging", # "immediate_charging", # "scheduled_charging" "partfill_charging" "smart_charging"
+    "settings_obj_fnct": "partfill_scheduled_charging", # "immediate_charging", # "scheduled_charging" "partfill_immediate_charging" "partfill_scheduled_charging" "smart_charging"
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
-    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,10),
+    "dso_subset" : range(0,30), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,20),
     "tso_subset" : range(4,5),
     }
 
@@ -48,8 +48,8 @@ parameters_model = {
     "ev_p_charge_home":11, # kW
     "ev_soc_max": 70, # kWh
     "ev_soc_init_rel": 0.9, # %
-    "ev_soc_preference": 1, # %
-    "ev_soc_departure": 1, # %
+    "ev_soc_preference": 0.8, # %
+    "ev_soc_departure": 0.8, # %
     "ev_p_charge_not_home": 22, # kW
     "ev_eta_in": 0.95,
     "ev_losses": 0.0001,
@@ -207,8 +207,16 @@ for chunk_dso in list_of_dso_chunks:
             
             # (spot_prices_xr_roll + network_charges_xr_roll).isel(r=1).to_pandas().plot()
 
+            # storage rolling takes place each day: pass 13:00 value as init soc for next day 
+            pd.set_option("mode.chained_assignment", None)  
+            timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
+            pd.set_option("mode.chained_assignment", "warn")    
+
+            idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==13) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
+            timesteps_roll.loc[:,"save_day_data"] = (timesteps_roll.counter_id < idx_to_roll.counter_id)
             
             
+            # ===== OPTIMIZE ====
             m = model2.model_emob_quarter_smart2(timesteps_roll, spot_prices_xr_roll, tariff_static_price, network_charges_xr_roll, emob_demand_xr_roll, emob_state_xr_roll, emob_departure_times, dict_idx_lookup_sub, irradiance_xr_roll, parameters_model, parameters_opti)
             m.solve('gurobi', OutputFlag=0, presolve=-1, LogToConsole=0, Method=-1, PreSparsify=-1)
 
@@ -227,12 +235,7 @@ for chunk_dso in list_of_dso_chunks:
 
 
 
-            # storage rolling takes place each day: pass 13:00 value as init soc for next day 
-            pd.set_option("mode.chained_assignment", None)  
-            timesteps_roll.loc[:,"counter_id"] = list(range(0,len(timesteps_roll)))  
-            pd.set_option("mode.chained_assignment", "warn")    
 
-            idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==13) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
     
             soc_ev_last = m["SOC_EV"].solution.isel(t=idx_to_roll.counter_id)
             if parameters_opti["settings_setup"] != "only_EV":

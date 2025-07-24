@@ -46,6 +46,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     # =========== VARIABLES ===============
     
     #OBJ_WITHOUT_PENALTIES = m.add_variables(name='OBJ_WITHOUT_PENALTIES')
+    C_OP_ALL_planning = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name='C_OP_ALL_planning')
+    C_OP_HOME_planning = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name="C_OP_HOME_planning")
     C_OP_ALL = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name='C_OP_ALL')
     C_OP_HOME = m.add_variables(coords=[set_dso, set_vehicle, set_setup], name="C_OP_HOME")
 
@@ -135,8 +137,14 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     elif parameters_opti["prices"] == "mean":
         cost_xr = np.maximum(network_charges_xr + tariff_price,0)
 
-    cons_cost_all = m.add_constraints(C_OP_ALL == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["r","t"])).item() * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost_all")
-    cons_cost_home = m.add_constraints(C_OP_HOME == (cost_xr * P_BUY).sum(dims="t"), name="cons_cost_home")
+    # cost of whole planning horizon for objective function
+    cons_cost_all_planning = m.add_constraints(C_OP_ALL_planning == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["t"])) * P_EV_NOT_HOME).sum(dims="t") , name="cons_cost_all_planning")
+    cons_cost_home_planning = m.add_constraints(C_OP_HOME_planning == (cost_xr * P_BUY).sum(dims="t"), name="cons_cost_home_planning")
+
+    # filter non-overlapping hours to save cost sum
+    idx_save = list(timesteps[timesteps.save_day_data].counter_id)
+    cons_cost_all_1pm = m.add_constraints(C_OP_ALL == (cost_xr * P_BUY + (parameters["cost_public_charge_pole"] + network_charges_xr.sel(s="reg").mean(["t"])) * P_EV_NOT_HOME).isel(t=idx_save).sum(dims="t") , name="cons_cost_all_1pm")
+    cons_cost_home_1pm = m.add_constraints(C_OP_HOME == (cost_xr * P_BUY).isel(t=idx_save).sum(dims="t"), name="cons_cost_home_1pm")
 
     
     #labels = m.compute_infeasibilities()
@@ -167,7 +175,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
             
 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
-        obj = C_OP_ALL.sum() # + 999999 * P_EV_NOT_HOME.sum()
+        obj = C_OP_ALL_planning.sum() # + 999999 * P_EV_NOT_HOME.sum()
       
     m.add_objective(obj)
     
