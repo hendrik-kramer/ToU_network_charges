@@ -28,6 +28,49 @@ import re
 import functions_tariff_network_charge_study.load_functions as f_load
 
 
+
+
+# ====================================
+# === BOX PLOT INPUT ST and annual reduction ====
+# ====================================
+
+
+filename = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
+all_prices = pd.read_excel(filename, sheet_name="Entgelte")
+
+
+st_values = all_prices["AP_ST_ct/kWh"].iloc[0:99]
+st_values.name = None
+modul1_values = all_prices["Modul_1_GP"].iloc[0:99]
+modul1_values.name = None
+
+meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black', markersize=4) #firebrick
+
+
+# Figure und Subplots (vertikal)
+fig_input_boxplot, axs_input_boxplots = plt.subplots(2, 1, figsize=(6, 3))
+
+# Erster Boxplot, horizontal
+st_values.plot(ax=axs_input_boxplots[0], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+axs_input_boxplots[0].set_title('Standard network charge in ct/kWh', fontsize=16)
+axs_input_boxplots[0].grid(which='major', axis='x', linestyle='--', color="lightgray")
+
+# Zweiter Boxplot, horizontal
+modul1_values.plot(ax=axs_input_boxplots[1], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+axs_input_boxplots[1].set_title('Annual network charge reduction in € (after tax)', fontsize=16)
+axs_input_boxplots[1].grid(which='major', axis='x', linestyle='--', color="lightgray")
+
+plt.tight_layout()
+plt.show()
+
+fig_input_boxplot.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\input_boxplots.svg", format="svg")
+
+
+
+
+
+
+
 my_fontsize = 20
 filename = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise\da_auktion_12_uhr_hourly\energy-charts_DAM_hourly_2018_2025.csv"
 
@@ -264,14 +307,14 @@ ax_ssc.vlines(x=[0], ymin=-yy, ymax=yy, colors=['gray'], linestyles=['--'], line
 ax_ssc.axline([-yy, -yy], [yy, yy], color="gray", linestyle="--", linewidth=2)
 ax_ssc.axline([yy, -yy], [-yy, yy], color="gray", linestyle="--", linewidth=2)
 
-ax_ssc.annotate("I",(-22.8, 11.5), fontsize=16)
-ax_ssc.annotate("II",(-7.5, 11.5), fontsize=16)
-ax_ssc.annotate("III",(7.2, 11.5), fontsize=16)
-ax_ssc.annotate("IV",(22.2, 11.5), fontsize=16)
-ax_ssc.annotate("V",(-23, -12), fontsize=16)
-ax_ssc.annotate("VI",(-7.5, -12), fontsize=16)
-ax_ssc.annotate("VII",(7.0, -12), fontsize=16)
-ax_ssc.annotate("VIII",(20.5, -12), fontsize=16)
+ax_ssc.annotate(r'$II_{market}$',(-24.9, 11.5), fontsize=16)
+ax_ssc.annotate(r'$II_{network}$',(-9.9, 11.5), fontsize=16)
+ax_ssc.annotate(r'$I_{network}$',(5.1, 11.5), fontsize=16)
+ax_ssc.annotate(r'$I_{market}$',(20.1, 11.5), fontsize=16)
+ax_ssc.annotate(r'$III_{market}$',(-19.9, -12), fontsize=16)
+ax_ssc.annotate(r'$III_{network}$',(-9.9, -12), fontsize=16)
+ax_ssc.annotate(r'$IV_{network}$',(0.1, -12), fontsize=16)
+ax_ssc.annotate(r'$IV_{market}$',(15.1, -12), fontsize=16)
 
 
 # Change major ticks to show every 20.
@@ -349,15 +392,17 @@ if (False):
 
 # get amount of points per region
 
-q1_spot_stronger = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) > np.array(y_vals)))
-q1_nc_stronger = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) < np.array(y_vals)))
+q1_spot = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) > np.array(y_vals)))
+q1_nc = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) > 0) & (np.array(x_vals) < np.array(y_vals)))
 
-q2 = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) > 0))
+q2_network = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) > 0) & (-np.array(x_vals) < np.array(y_vals)))
+q2_spot = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) > 0) & (-np.array(x_vals) > np.array(y_vals)))
 
-q3_nc_stronger = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) > np.array(y_vals)))
-q3_spot_stronger = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) < np.array(y_vals)))
+q3_nc = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) > np.array(y_vals)))
+q3_spot = np.mean((np.array(x_vals) < 0) & (np.array(y_vals) < 0) & (np.array(x_vals) < np.array(y_vals)))
 
-q4 = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0))
+q4_nc = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0) & (np.array(x_vals) < -np.array(y_vals)))
+q4_market = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0) & (np.array(x_vals) > -np.array(y_vals)))
 
 
 ax_ssc.set_xlim(xmin=-xx, xmax=xx)

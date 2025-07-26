@@ -21,17 +21,26 @@ from sklearn import linear_model
 
 
 # Example usage:
-x = np.array([1, 2, 3, 4, 5])
-y = np.array([2, 4, 5, 4, 5])
+#x = np.array([1, 2, 3, 4, 5])
+#y = np.array([2, 4, 5, 4, 5])
 
 
 folder_path = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" +  r"\\"
 
+# only ev
 #file_new_contract = r"2025-07-10_11-32_all_spot_scheduled_charging_only_EV_r50_v10" +r"\\"
 file_new_static = r"2025-07-12_07-32_all_mean_smart_charging_only_EV_r100_v50"  + r"\\"
 file_baseline_static = r"2025-07-13_08-51_all_mean_immediate_charging_only_EV_r100_v50" + r"\\"
 file_new_dynamic = r"2025-07-13_01-49_all_spot_smart_charging_only_EV_r100_v50"  + r"\\"
 file_baseline_dynamic = r"2025-07-14_10-23_all_spot_immediate_charging_only_EV_r100_v50" + r"\\"
+
+# prosumage
+file_new_static = r"2025-07-21_22-04_all_mean_smart_charging_prosumage_r30_v20"  + r"\\"
+file_baseline_static = r"2025-07-21_16-28_all_mean_immediate_charging_prosumage_r30_v20" + r"\\"
+file_new_dynamic = r"2025-07-13_01-49_all_spot_smart_charging_only_EV_r100_v50"  + r"\\"
+file_baseline_dynamic = r"2025-07-21_21-28_all_spot_immediate_charging_prosumage_30_v20" + r"\\"
+
+
 
 result_P_BUY_old_static = xr.open_dataarray(folder_path + file_baseline_static + "P_BUY.nc")
 result_P_BUY_new_static = xr.open_dataarray(folder_path + file_new_static + "P_BUY.nc")

@@ -190,6 +190,12 @@ def load_network_charges(input_filepath, timesteps):
     charges_HSN = charges_HSN.drop(charges_HSN.index[0])
     charges_HSN.index = charges_HSN.index.str.replace("AP_","").str.replace("T_ct/kWh","")
     
+    if "network_charges_sensisitity_study": # overwrite with altere NT and HT charges
+        print("Modify network charges to match 10% NT")
+        new_charges = pd.read_csv(r"Z:\10_Paper\13_Alleinautorenpaper\VNB\new_network_charges_sensitivity.csv", index_col="r").rename(columns={"HT":"H","NT":"N"}).transpose()
+        charges_HSN.loc["H",:] = new_charges.loc["H",:]
+        charges_HSN.loc["N",:] = new_charges.loc["N",:]
+
     
     # fill ToU segments with network charge numbers
     # 1) create array of correct dimensions

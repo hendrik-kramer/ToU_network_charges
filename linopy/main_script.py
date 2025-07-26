@@ -35,8 +35,9 @@ parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "auction": "da_auction_hourly_12_uhr_stairs",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
-    "prices": "mean", # "spot", "mean"
+    "prices": "spot", # "spot", "mean"
     "settings_obj_fnct": "partfill_scheduled_charging", # "immediate_charging", # "scheduled_charging" "partfill_immediate_charging" "partfill_scheduled_charging" "smart_charging"
+    "network_charges_sensisitity_study": False,
     "rolling_window": "day", # "no/year", "day"
     "quarter" : "all", # "Q1", "Q2, ...
     "dso_subset" : range(0,30), # excel read in only consideres 100 rows!
@@ -64,22 +65,24 @@ parameters_model = {
     }
 
 
+network_drive = r"\\wiwinf-file01.wiwinf.uni-due.de\home\hendrik.kramer" # r"Z:" 
+
 
 # get relevant timesteps to compute KW1-KW52/53
 timesteps = f_load.load_timesteps(parameters_opti["year"])
 
 # Load spot prices
-parameter_folderpath_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
+parameter_folderpath_prices = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
 spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, parameters_opti["auction"], timesteps)  # in ct/kWh
 tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
-parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
+parameter_filepath_dsos = network_drive + r"\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
 network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge = f_load.load_network_charges(parameter_filepath_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
 
 # Load e-Mobility
-parameter_folderpath_emob_demand = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
-parameter_folderpath_emob_state = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
+parameter_folderpath_emob_demand = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
+parameter_folderpath_emob_state = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
 emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0)   # CAN BE IMPROVED, ONLY FIRST SHOT
@@ -87,10 +90,11 @@ emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arriva
 
 
 # load irradiation // dummy value 
-#parameter_folder_irradiance = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation"
-parameter_file_hochrechung = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\netztransparenz\Hochrechnung Solarenergie [2025-03-21 13-55-15].csv" # in MW, in UTC
-parameter_file_capacities = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\install_capa_controllarea_mid_year.csv" # in MW
-parameter_file_fulloadhours = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\mifri_pv_fullloadhours.csv" # in MW, in UTC
+#parameter_folder_irradiance = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\irradiation"
+parameter_file_hochrechung = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\netztransparenz\Hochrechnung Solarenergie [2025-03-21 13-55-15].csv" # in MW, in UTC
+parameter_file_capacities = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\install_capa_controllarea_mid_year.csv" # in MW
+parameter_file_fulloadhours = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\irradiation\mifri_pv_fullloadhours.csv" # in MW, in UTC
+
 
 # data not plausible (FLH) of 50hzt! Do not use
 irradiance_xr = f_load.load_irradiance(parameter_file_hochrechung, parameter_file_capacities, parameter_file_fulloadhours, timesteps)
@@ -150,10 +154,6 @@ for chunk_dso in list_of_dso_chunks:
     parameters_opti["dso_subset"] = chunk_dso
     
 
-    # create and run model
-    # m = model_emob_annual_forsight_smart.model_emob_annual_smart(timesteps, spot_prices_xr, tariff_prices_xr, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters_model, parameters_opti)
-    
-
     # initialize rolling planning timestep ranges
     if parameters_opti["rolling_window"] == "day":
         unique_days = timesteps["DateTime"].dt.date.unique()
@@ -176,6 +176,7 @@ for chunk_dso in list_of_dso_chunks:
             print("===== dso_chunk: " + str(chunk_dso) + ", time: " + str(ct_rolling) + " =====")
             
             timesteps_roll = timesteps.iloc[list(ct_rolling)]
+            timesteps_roll.is_copy = False # to avoid many warnings that modifying "timesteps_roll" does not affect parent "timesteps"
             
             # cut off time after 13 pm of the next day for saving results, but exclude last day
             if ct_rolling[0] < rolling_timesteps[-1][0]: # "this start time is smaller than last day's start time"
@@ -213,8 +214,10 @@ for chunk_dso in list_of_dso_chunks:
             pd.set_option("mode.chained_assignment", "warn")    
 
             idx_to_roll = timesteps_roll[(timesteps_roll.DateTime.dt.hour==13) & (timesteps_roll.DateTime.dt.minute==00)].iloc[-1]
+            #warnings.simplefilter(action='ignore', category="SettingWithCopyWarning")      
             timesteps_roll.loc[:,"save_day_data"] = (timesteps_roll.counter_id < idx_to_roll.counter_id)
-            
+            #warnings.simplefilter(action='default', category="SettingWithCopyWarning")      
+
             
             # ===== OPTIMIZE ====
             m = model2.model_emob_quarter_smart2(timesteps_roll, spot_prices_xr_roll, tariff_static_price, network_charges_xr_roll, emob_demand_xr_roll, emob_state_xr_roll, emob_departure_times, dict_idx_lookup_sub, irradiance_xr_roll, parameters_model, parameters_opti)
@@ -402,8 +405,10 @@ result_P_EV_NOT_HOME_1970.to_netcdf(folder_path / "P_EV_NOT_HOME.nc")
 with open(folder_path / "parameters_opti.txt", 'w') as f:
     f.write(pd.DataFrame.from_dict(parameters_opti, orient='index').to_string(header=False, index=True))
     
+parameters_model_wo_2D = parameters_model
+del parameters_model_wo_2D['ev_soc_init_abs']
 with open(folder_path / "parameters_model.txt", 'w') as f:
-    f.write(pd.DataFrame.from_dict(parameters_model, orient='index').to_string(header=False, index=True))
+    f.write(pd.DataFrame.from_dict(parameters_model_wo_2D, orient='index').to_string(header=False, index=True))
     
 print("Saved data sucessfully to: " + str(folder_path))
 
