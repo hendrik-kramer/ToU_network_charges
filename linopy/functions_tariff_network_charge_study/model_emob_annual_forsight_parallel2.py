@@ -29,6 +29,10 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
     emob_home_xr = (emob_state_xr=="home")
     emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean(dim="t")).drop_vars("s")
+    #emob_STHT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean(dim="t")).drop_vars("s")
+
+    emob_STHT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").min("t") + 0.01).drop_vars("s")
+
     #emob_HT_xr = (network_charges_xr>(network_charges_xr.mean(dim="t")+0.01))
 
     
@@ -37,7 +41,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
             
     # Definiere Sets
     set_time = pd.Index(timesteps["DateTime"], name="t")
-    #print("set_time " , str(list(set_time)))
+    #print("set_time " , str(list(set_time)))prices in
     set_dso = pd.Index(network_charges_xr["r"].values, name="r")
     set_region = pd.Index(irradiance_xr["a"].values, name="a")
     set_vehicle = pd.Index(emob_demand_xr["v"].values, name="v")
@@ -164,7 +168,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
         # create linrange for temporal preference
         timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
         timepref_xr = xr.DataArray(timepref_pd["timepref"])
-        obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_HT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
+        obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_STHT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
 
     
     elif parameters_opti["settings_obj_fnct"] == "partfill_immediate_charging":
@@ -172,7 +176,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
         
         
     elif parameters_opti["settings_obj_fnct"] == "partfill_scheduled_charging":
-        obj = SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() + 999999999*(emob_HT_xr*P_BUY).sum()
+        obj = SOC_BELOW_PREF.sum() + 999999 * P_EV_NOT_HOME.sum() + 999999999*(emob_STHT_xr*P_BUY).sum()
             
 
     elif parameters_opti["settings_obj_fnct"] == "smart_charging":    
