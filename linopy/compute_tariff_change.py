@@ -14,12 +14,12 @@ import xarray as xr
 import functions_tariff_network_charge_study.load_functions as f_load
 
 
-
+## Set Sensisitivity-Parameter zu FALSE !!!
 
 # Load network charges (regular and reduced)
 parameter_filepath_dsos = r"Z:\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
 timesteps = f_load.load_timesteps(2024)
-network_charges_xr, _, _, _,  xr_ht_charge, xr_st_charge, xr_nt_charge = f_load.load_network_charges(parameter_filepath_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr, _, _, _,  xr_ht_charge, xr_st_charge, xr_nt_charge, different_charges = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
 network_charges_red_xr = network_charges_xr.sel(s="red")
 
 xr_nt_charge_new = xr_st_charge / 10
@@ -56,6 +56,9 @@ xr_ht_charge_new = xr_ht_charge_new + xr_ht_charge
 
 xr_ht_charge_new.mean()
 xr_ht_charge_new.sum() / change_possible.sum()
+
+ht_st_fraction = (xr_ht_charge_new / xr_st_charge).to_pandas().sort_values(ascending=False) # check if 200% is not exceeded
+ht_st_fraction[ht_st_fraction > 2].shape
 
 pd_new_charges = pd.concat([xr_nt_charge_new.to_pandas(), xr_ht_charge_new.to_pandas()], axis=1).rename(columns={0:"NT", 1:"HT"})
 pd_new_charges.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\VNB\new_network_charges_sensitivity.csv")

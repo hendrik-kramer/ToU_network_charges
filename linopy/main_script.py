@@ -35,7 +35,7 @@ parameters_opti = {
     "year":2024,
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "auction": "da_auction_hourly_12_uhr_stairs",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
-    "prices": "spot", # "spot", "mean"
+    "prices": "mean", # "spot", "mean"
     "settings_obj_fnct": "partfill_scheduled_charging", # "immediate_charging", # "scheduled_charging" "partfill_immediate_charging" "partfill_scheduled_charging" "smart_charging"
     "network_charges_sensisitity_study": False,
     "rolling_window": "day", # "no/year", "day"
@@ -78,7 +78,7 @@ tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
 parameter_filepath_dsos = network_drive + r"\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
-network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge = f_load.load_network_charges(parameter_filepath_dsos, timesteps) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, sensi_different = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
 
 # Load e-Mobility
 parameter_folderpath_emob_demand = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"

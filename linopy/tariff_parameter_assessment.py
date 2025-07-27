@@ -20,10 +20,10 @@ from sklearn import linear_model
 
 
 
-# Example usage:
-#x = np.array([1, 2, 3, 4, 5])
-#y = np.array([2, 4, 5, 4, 5])
 
+# ======================================
+# ===== TARIFF REGRESSION ======
+# ======================================
 
 folder_path = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" +  r"\\"
 

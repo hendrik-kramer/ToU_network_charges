@@ -158,7 +158,7 @@ def get_annual_static_tariff_prices(spot_prices_xr):
     
 
 
-def load_network_charges(input_filepath, timesteps):
+def load_network_charges(input_filepath, timesteps, parameters_opti):
 
     network_charges_hours = pd.read_excel(input_filepath, sheet_name=0).head(100)
     network_charges_euro = pd.read_excel(input_filepath, sheet_name=1).head(100)
@@ -190,12 +190,14 @@ def load_network_charges(input_filepath, timesteps):
     charges_HSN = charges_HSN.drop(charges_HSN.index[0])
     charges_HSN.index = charges_HSN.index.str.replace("AP_","").str.replace("T_ct/kWh","")
     
-    if "network_charges_sensisitity_study": # overwrite with altere NT and HT charges
+    if parameters_opti["network_charges_sensisitity_study"]: # overwrite with altere NT and HT charges
         print("Modify network charges to match 10% NT")
         new_charges = pd.read_csv(r"Z:\10_Paper\13_Alleinautorenpaper\VNB\new_network_charges_sensitivity.csv", index_col="r").rename(columns={"HT":"H","NT":"N"}).transpose()
+        different_charges = ((new_charges.loc["N",:] - charges_HSN.loc["N",:]).abs() >= 0.01)
         charges_HSN.loc["H",:] = new_charges.loc["H",:]
         charges_HSN.loc["N",:] = new_charges.loc["N",:]
-
+    else:
+        different_charges = None
     
     # fill ToU segments with network charge numbers
     # 1) create array of correct dimensions
@@ -251,7 +253,7 @@ def load_network_charges(input_filepath, timesteps):
     xr_nt_charge = xr.DataArray( charges_HSN.loc["N",:] , dims="r")
     
     
-    return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge
+    return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, different_charges
 
 
 def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):

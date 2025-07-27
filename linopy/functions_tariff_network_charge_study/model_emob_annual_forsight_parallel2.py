@@ -29,7 +29,8 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
     emob_home_xr = (emob_state_xr=="home")
     emob_HT_xr = (network_charges_xr.sel(s="red")>network_charges_xr.sel(s="red").mean(dim="t")).drop_vars("s")
-    
+    #emob_HT_xr = (network_charges_xr>(network_charges_xr.mean(dim="t")+0.01))
+
     
 
     m = Model()
@@ -125,7 +126,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
 
 
     # penalize if below preference
-    cons_violation_preference  = m.add_constraints(SOC_EV + SOC_BELOW_PREF >= parameters["ev_soc_preference"] * parameters["ev_soc_max"], name='cons_preference_violation')
+    cons_violation_preference  = m.add_constraints(SOC_EV + SOC_BELOW_PREF >= emob_home_xr * parameters["ev_soc_preference"] * parameters["ev_soc_max"], name='cons_preference_violation')
 
     
     # PENALTY

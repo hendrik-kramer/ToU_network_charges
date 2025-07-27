@@ -149,7 +149,7 @@ else:
 
 
 # ==============================================
-# ===== MIXED SIGNALS HEATMAP + CENTROIDS =====
+# ===== MIXED SIGNALS HEATMAP + CENTROIDS =====  // SET SENSITIVITY STUDY = FALSE
 # ==============================================
 
 # load all 
@@ -184,7 +184,9 @@ all_prices_minus_mean_15min.index.name = ""
 
 #all_prices_minus_mean_15min_xr = xr.DataArray(all_prices_minus_mean_15min["spot_signal_ct_kWh"], dims="t")
 
-# ===== LOAD NETWORK CHARGES ====
+
+
+# ===== LOAD NETWORK CHARGES ====  
 
 # run main script until loop before to get variables
 
@@ -194,7 +196,7 @@ for ct_year in [2018, 2019, 2020, 2021, 2022, 2023, 2024]:
     timesteps_all = pd.concat([timesteps_all, timesteps_ct], axis=0)
 timesteps_all_years = timesteps_all.drop_duplicates()
 
-network_charges_xr_all_years, _ , _ , _ , _ , _, _   = f_load.load_network_charges(parameter_filepath_dsos, timesteps_all_years) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr_all_years, _ , _ , _ , _ , _ , _ , _   = f_load.load_network_charges(parameter_filepath_dsos, timesteps_all_years, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
 network_charges_pandas_all_years = network_charges_xr_all_years.sel(s="red").drop("s").to_pandas()
 network_charges_pandas_all_years_unique = network_charges_pandas_all_years[~network_charges_pandas_all_years.index.duplicated(keep='first')]
 network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_years_unique[network_charges_pandas_all_years_unique.index.year<=2024]
@@ -203,7 +205,7 @@ network_charges_signal = network_charges_pandas_all_years_unique_no_2025 - netwo
 
 
 
-# ===== HEATMAP PLOT =====
+# ===== HEATMAP PLOT ===== 
 
 
 
@@ -295,7 +297,7 @@ ax_ssc.tick_params(axis='y', labelsize=my_fontsize)
 
 # add colorbar
 cbar = fig_signal_scatter.colorbar(hist_signal, orientation="vertical")
-cbar.set_label("Data observations in each bin", fontsize=my_fontsize)
+cbar.set_label("Data observations in each bin \n(Heatmap covers 2018-2024)", fontsize=my_fontsize)
 ticklabs = cbar.ax.get_yticklabels()
 cbar.ax.set_yticklabels(ticklabs, fontsize=my_fontsize)  
 
@@ -381,13 +383,14 @@ ax_ssc.scatter(x_vec_nonan_neg_2024_mean, y_vec_nonan_neg_2024_mean, color="dark
 #plt.legend(loc="lower right", title="    mean regression \n   through origin for \nupper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
 plt.legend(loc="lower right", title="        Centroids for \n upper/lower half-plane", fontsize=16, title_fontsize=16, alignment="center")
 
+ax_ssc.set_xlim(xmin=-xx, xmax=xx)
+ax_ssc.set_ylim(-yy,yy)
+
 
 if (False):
     fig_test, ax_test = plt.subplots(layout='constrained')
     ax_test.scatter(x_vec_nonan_pos_2024, y_vec_nonan_pos_2024, alpha=0.01)
     ax_test.plot(x_pos_vals, a_reg_pos_2024*x_pos_vals, color="red", linestyle="-", linewidth=2, label="only 2024") #" \n (m_pos=" + "{:.4f}".format(a_reg_pos_2024[0]) + ", m_neg=" + "{:.4f}".format(a_reg_neg_2024[0]) + ")"  )
-
-
 
 
 # get amount of points per region
@@ -405,8 +408,7 @@ q4_nc = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0) & (np.array(x_va
 q4_market = np.mean((np.array(x_vals) > 0) & (np.array(y_vals) < 0) & (np.array(x_vals) > -np.array(y_vals)))
 
 
-ax_ssc.set_xlim(xmin=-xx, xmax=xx)
-ax_ssc.set_ylim(-yy,yy)
+
 
 fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_da_signals.svg", format="svg")
 
