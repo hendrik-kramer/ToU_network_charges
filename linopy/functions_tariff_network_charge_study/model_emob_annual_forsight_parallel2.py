@@ -156,19 +156,30 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
     #m.print_infeasibilities()  
     
     # zu minimierende Zielfunktion
-    if parameters_opti["settings_obj_fnct"] == "immediate_charging":
+    if (parameters_opti["settings_obj_fnct"] == "immediate_charging") or (parameters_opti["settings_obj_fnct"] == "scheduled_charging"):
         
         # create linrange for temporal preference
-        timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
-        timepref_xr = xr.DataArray(timepref_pd["timepref"])
-        obj = (timepref_xr * P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
-    
-    
-    elif parameters_opti["settings_obj_fnct"] == "scheduled_charging":
-        # create linrange for temporal preference
-        timepref_pd = pd.DataFrame(15 * np.linspace( 1, len(set_time), len(set_time) ) + 100, index=network_charges_xr["t"].to_pandas().index, columns=["timepref"])
-        timepref_xr = xr.DataArray(timepref_pd["timepref"])
-        obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_STHT_xr*P_BUY).sum() + 999999 * P_EV_NOT_HOME.sum()
+        timepref_xr = 1*emob_home_xr
+        timepref_xr[:] = 0
+        
+        arrivals_xr = ((emob_home_xr) & (emob_home_xr.shift(t=-1).fillna(emob_home_xr.isel(t=-1))==False))
+        arrivals_idx = 1*arrivals_xr*xr.DataArray(range(0,96), dims="t")
+
+        for ct_v in range(0,len(emob_home_xr["v"])): # each vehicle
+            arrivals_v = arrivals_idx.isel(v=ct_v).to_numpy()
+            arrivals_v_tf = 1*(arrivals_v>0)
+            arrivals_v_nz = arrivals_v[arrivals_v>0]
+            reduction = arrivals_v_tf
+            reduction[reduction>0] = arrivals_v_nz
+            reduction = pd.Series(reduction).replace(0, np.nan).ffill().to_numpy()
+            reduction[np.isnan(reduction)] = 0
+            timepref_xr[:,ct_v] = 100 + 1*np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) - 1 * reduction   
+            
+        if parameters_opti["settings_obj_fnct"] == "immediate_charging":   
+            obj = (timepref_xr * P_BUY).sum() + 999 * P_EV_NOT_HOME.sum()
+            
+        else:  # scheduled
+            obj = (timepref_xr * P_BUY).sum() + 9999999*(emob_STHT_xr*P_BUY).sum() + 999 * P_EV_NOT_HOME.sum()
 
     
     elif parameters_opti["settings_obj_fnct"] == "partfill_immediate_charging":
