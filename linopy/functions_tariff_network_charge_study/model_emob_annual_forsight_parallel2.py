@@ -163,7 +163,7 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
         timepref_xr[:] = 0
         
         arrivals_xr = ((emob_home_xr) & (emob_home_xr.shift(t=-1).fillna(emob_home_xr.isel(t=-1))==False))
-        arrivals_idx = 1*arrivals_xr*xr.DataArray(range(0,96), dims="t")
+        arrivals_idx = 1*arrivals_xr*xr.DataArray(range(0,len(arrivals_xr["t"])), dims="t")
 
         for ct_v in range(0,len(emob_home_xr["v"])): # each vehicle
             arrivals_v = arrivals_idx.isel(v=ct_v).to_numpy()
@@ -173,7 +173,12 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
             reduction[reduction>0] = arrivals_v_nz
             reduction = pd.Series(reduction).replace(0, np.nan).ffill().to_numpy()
             reduction[np.isnan(reduction)] = 0
-            timepref_xr[:,ct_v] = 100 + 1*np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) - 1 * reduction   
+            if len(arrivals_v_nz) > 0:
+                penalize_noon = 50 * np.array(np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) < arrivals_v_nz[0]) # before first arrival
+            else:
+                penalize_noon = np.zeros(len(emob_home_xr["t"]))
+                
+            timepref_xr[:,ct_v] = 100 + 1*np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) - 1 * reduction + penalize_noon
             
         if parameters_opti["settings_obj_fnct"] == "immediate_charging":   
             obj = (timepref_xr * P_BUY).sum() + 999 * P_EV_NOT_HOME.sum()
