@@ -6,7 +6,7 @@ import xarray as xr
 import numpy as np
 import pandas as pd
 from datetime import datetime as dt
-
+import random
 
 def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_charges_xr, emob_demand_xr, emob_state_xr, emob_departure_times, dict_idx_lookup, irradiance_xr, parameters, parameters_opti):
 
@@ -176,7 +176,9 @@ def model_emob_quarter_smart2(timesteps, spot_prices_xr, tariff_price, network_c
             if len(arrivals_v_nz) > 0:
                 penalize_noon = 50 * np.array(np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) < arrivals_v_nz[0]) # before first arrival
             else:
-                penalize_noon = np.zeros(len(emob_home_xr["t"]))
+                # delay randomly by 1-12 quarter hours
+                len_random = random.randint(0, 6*4)
+                penalize_noon = np.hstack(( 100*np.ones(len_random), np.zeros(len(emob_home_xr["t"]) - len_random)))
                 
             timepref_xr[:,ct_v] = 100 + 1*np.linspace(1,len(emob_home_xr["t"]),len(emob_home_xr["t"])) - 1 * reduction + penalize_noon
             
