@@ -38,7 +38,7 @@ slp = pd.read_excel(filepath_slp, sheet_name="Jahreszeitreihe_2024")[["Zeitstemp
 slp["Zeitstempel"] = network_charges_xr["t"].to_pandas().index
 slp = slp.set_index("Zeitstempel")
 slp.index.name = "t"
-slp["Ergebnis"] = 2500/sum(slp["Ergebnis"]) * slp["Ergebnis"] # scale to 2500 kWh
+slp["Ergebnis"] = 3750/sum(slp["Ergebnis"]) * slp["Ergebnis"] # scale to 3750 kWh
 slp_xr = xr.DataArray(slp["Ergebnis"])
 
 
