@@ -28,7 +28,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 length_dso_chunk = 5
 
-charge_strategy = "scheduled"  # "smart", "scheduled", "immediate"
+charge_strategy = "smart"  # "smart", "scheduled", "immediate"
 
 
 weight_lookup = {"smart":{"weight_time_preference":0, "weight_only_low_segment":0},
@@ -55,7 +55,7 @@ parameters_model = {
     }
 
 parameters_opti = {
-    "prices": "spot", # "spot", "mean"
+    "prices": "mean", # "spot", "mean"
     "year":2024,
     "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,10),

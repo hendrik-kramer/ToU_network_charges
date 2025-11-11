@@ -119,7 +119,7 @@ def model_emob_quarter_smart2(timesteps, cost_home_xr, network_charges_xr, emob_
 
 
     # EV Charging behavior
-    cons_ev_charge_home_max = m.add_constraints(P_HOME <= emob_home_xr * parameters_model["ev_p_charge_home"], name='cons_ev_charge_home_max')
+    cons_ev_charge_home_max = m.add_constraints(P_HOME <= 1*emob_home_xr * parameters_model["ev_p_charge_home"], name='cons_ev_charge_home_max')
     # always allow public charging to prevent infeasibilities
     #cons_ev_charge_public_max = m.add_constraints(P_PUBLIC <= emob_public_xr * parameters_model["ev_p_charge_not_home"], name='cons_ev_charge_public_max') # optional
     cons_ev_charge_public_max = m.add_constraints(P_PUBLIC <= parameters_model["ev_p_charge_not_home"], name='cons_ev_charge_public_max') # optional
@@ -156,7 +156,7 @@ def model_emob_quarter_smart2(timesteps, cost_home_xr, network_charges_xr, emob_
 
     cons_no_charge_before_first_arrival = m.add_constraints(PENALTY_NO_CHARGE_BEFORE_ARRIVAL == parameters_opti["penalty_no_charge_before_arrival"] * (emob_true_before_geting_home_xr * P_EV).sum("t"), name='cons_penalty_no_charge_before_arrival')
 
-    obj = C_ALL_planning + 0 + parameters_opti["weight_time_preference"] * PENALTY_TIMEPREF + parameters_opti["weight_only_low_segment"] * PENALTY_ST_HT + parameters_opti["weight_no_charge_before_arrival"] * PENALTY_NO_CHARGE_BEFORE_ARRIVAL
+    obj = C_ALL_planning.sum() + 0 + parameters_opti["weight_time_preference"] * PENALTY_TIMEPREF.sum() + parameters_opti["weight_only_low_segment"] * PENALTY_ST_HT.sum() + parameters_opti["weight_no_charge_before_arrival"] * PENALTY_NO_CHARGE_BEFORE_ARRIVAL.sum() + 99999 * P_PUBLIC.sum()
 
 
     m.add_objective(obj)
