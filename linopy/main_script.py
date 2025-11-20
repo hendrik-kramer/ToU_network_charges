@@ -44,24 +44,17 @@ parameters_model = {
     "ev_p_charge_not_home": 22, # kW
     "ev_eta_in": 0.95,
     "ev_losses": 0.01, # 10 W for standby
-    "bess_p_max": 5, # kW
-    "bess_soc_max": 9, # kWh
-    "bess_soc_init_rel": 0.9, # %
-    "bess_eta_ch": 0.95, # %
-    "bess_eta_dch": 0.95, # %
-    "bess_losses": 0.01, # % standby losses
-    "pv_p_max": 8, # kW
     "cost_public_charge_pole": 43.7 # ct/kW
     }
 
 parameters_opti = {
-    "prices": "mean", # "spot", "mean"
+    "prices": "spot", # "spot", "mean"
     "year":2024,
-    "dso_subset" : range(0,10), # excel read in only consideres 100 rows!
-    "emob_subset" : range(0,10),
+    "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,50),
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "network_charges_sensisitity_study": False,
-    "auction": "da_auction_hourly_12_uhr_stairs",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
+    "auction": "da_auction_hourly_12_uhr_cubic",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "quarter" : "all", # "Q1", "Q2, ...
     # relevant after STRISE sconferece
     "penalty_no_charge_before_arrival": 9999,
@@ -243,22 +236,40 @@ for chunk_dso in list_of_dso_chunks:
 
 
         soc_ev_last = m["SOC_EV"].solution.isel(t=idx_to_roll.counter_id)
-   
-
-        # save daily results to common data structures of whole time horizon
+        
+        # save daily results to common data structures of whole time horizon --> merge together
         if first_iteration:
+            # adding all to one value
             result_C_ALL_roll = m["C_ALL"].solution
             result_C_HOME_roll = m["C_HOME"].solution
             result_SOC_EV_roll = m["SOC_EV"].solution.isel(t=range(0,idx_to_roll.counter_id)) # slight error, as only values including 12:45 are copied ...
             result_P_HOME_roll =  m["P_HOME"].solution.isel(t=range(0,idx_to_roll.counter_id))  # ... are also used as initial soc for next optimization, see above.
             result_P_PUBLIC_roll = m["P_PUBLIC"].solution.isel(t=range(0,idx_to_roll.counter_id))
             
+            ct_day = 1
+            result_C_ALL_roll_daily = m["C_ALL"].solution.expand_dims("d").assign_coords(d=[ct_day])
+            result_C_HOME_roll_daily = m["C_HOME"].solution.expand_dims("d").assign_coords(d=[ct_day]) 
+            
+            result_P_HOME_roll_daily = m["P_HOME"].solution.sum(dim="t").expand_dims("d").assign_coords(d=[ct_day])     
+            result_P_PUBLIC_roll_daily = m["P_PUBLIC"].solution.sum(dim="t").expand_dims("d").assign_coords(d=[ct_day])     
+
+            
         else:
+            # adding all to one  value
             result_C_ALL_roll = result_C_ALL_roll + m["C_ALL"].solution
             result_C_HOME_roll = result_C_HOME_roll + m["C_HOME"].solution
             result_SOC_EV_roll = xr.concat([result_SOC_EV_roll, m["SOC_EV"].solution.isel(t=idx_today_opti)], dim="t")
             result_P_HOME_roll = xr.concat([result_P_HOME_roll, m["P_HOME"].solution.isel(t=idx_today_opti)], dim="t")
             result_P_PUBLIC_roll = xr.concat([result_P_PUBLIC_roll, m["P_PUBLIC"].solution.isel(t=idx_today_opti)], dim="t")
+   
+            ct_day = ct_day + 1        
+            result_C_ALL_roll_daily = xr.concat([result_C_ALL_roll_daily, m["C_ALL"].solution.expand_dims("d").assign_coords(d=[ct_day])], dim='d')
+            result_C_HOME_roll_daily = xr.concat([result_C_HOME_roll_daily, m["C_HOME"].solution.expand_dims("d").assign_coords(d=[ct_day])], dim='d')
+            
+            result_P_HOME_roll_daily = xr.concat([result_P_HOME_roll_daily, m["P_HOME"].solution.sum(dim="t").expand_dims("d").assign_coords(d=[ct_day])], dim='d')
+            result_P_PUBLIC_roll_daily = xr.concat([result_P_PUBLIC_roll_daily, m["P_PUBLIC"].solution.sum(dim="t").expand_dims("d").assign_coords(d=[ct_day])], dim='d')
+
+
 
         # roll over soc values of subsequent first timestep
         first_iteration = False
@@ -272,6 +283,13 @@ for chunk_dso in list_of_dso_chunks:
         result_SOC_EV = result_SOC_EV_roll
         result_P_HOME =  result_P_HOME_roll
         result_P_PUBLIC = result_P_PUBLIC_roll
+        
+        result_C_ALL_daily = result_C_ALL_roll_daily
+        result_C_HOME_daily = result_C_HOME_roll_daily
+        result_P_HOME_daily = result_P_HOME_roll_daily
+        result_P_PUBLIC_daily = result_P_PUBLIC_roll_daily
+
+
 
     else:
         result_C_ALL = xr.concat([result_C_ALL, result_C_ALL_roll], dim="r")
@@ -279,9 +297,11 @@ for chunk_dso in list_of_dso_chunks:
         result_SOC_EV = xr.concat([result_SOC_EV, result_SOC_EV_roll], dim="r")
         result_P_HOME = xr.concat([result_P_HOME, result_P_HOME_roll], dim="r")
         result_P_PUBLIC = xr.concat([result_P_PUBLIC, result_P_PUBLIC_roll], dim="r")
-
-
-
+        
+        result_C_ALL_daily = xr.concat([result_C_ALL_daily, result_C_ALL_roll_daily], dim="r")
+        result_C_HOME_daily = xr.concat([result_C_HOME_daily, result_C_HOME_roll_daily], dim="r")
+        result_P_HOME_daily = xr.concat([result_P_HOME_daily, result_P_HOME_roll_daily], dim="r")
+        result_P_PUBLIC_daily =xr.concat([result_P_PUBLIC_daily, result_P_PUBLIC_roll_daily], dim="r")
 
 
 
@@ -317,8 +337,10 @@ str_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["prices"] + "_" + charge_strategy + "_" + parameters_opti["settings_setup"])
 os.makedirs(folder_path, exist_ok=True)
 
-result_C_ALL_eur.to_netcdf(folder_path / "C_ALL.nc")
-result_C_HOME_eur.to_netcdf(folder_path / "C_HOME.nc")
+#result_C_ALL_eur.to_netcdf(folder_path / "C_ALL.nc")
+#result_C_HOME_eur.to_netcdf(folder_path / "C_HOME.nc")
+result_C_ALL.to_netcdf(folder_path / "C_ALL.nc")
+result_C_HOME.to_netcdf(folder_path / "C_HOME.nc")
 result_SOC_EV_1970.to_netcdf(folder_path / "SOC_EV.nc")
 result_P_HOME_1970.to_netcdf(folder_path / "P_HOME.nc")
 result_P_PUBLIC_1970.to_netcdf(folder_path / "P_PUBLIC.nc")

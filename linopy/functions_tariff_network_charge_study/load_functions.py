@@ -57,7 +57,7 @@ def load_spot_prices(input_year, input_folderpath, str_auction, timesteps):
         if "stairs" in str_auction:
             raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().ffill()
         else:
-            raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().shift(2).interpolate(method="linear")  # shift value to half hour value
+            raw_price_data = raw_price_data.resample("15min", on="Time_utc").mean().shift(2).interpolate(method="cubicspline").bfill()  # shift value to half hour value
                 
         raw_price_data['Time_DE'] = raw_price_data.index.tz_convert('Europe/Berlin')
         raw_price_data['iso_year'] = raw_price_data['Time_DE'].dt.isocalendar().year
