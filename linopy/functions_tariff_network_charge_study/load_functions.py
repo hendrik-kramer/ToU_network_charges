@@ -193,9 +193,16 @@ def load_network_charges(input_filepath, timesteps, parameters_opti):
     if parameters_opti["network_charges_sensisitity_study"]: # overwrite with altere NT and HT charges
         print("Modify network charges to match 10% NT")
         new_charges = pd.read_csv(r"Z:\10_Paper\13_Alleinautorenpaper\VNB\new_network_charges_sensitivity.csv", index_col="r").rename(columns={"HT":"H","NT":"N"}).transpose()
-        different_charges = ((new_charges.loc["N",:] - charges_HSN.loc["N",:]).abs() >= 0.01)
+        
+        different_charges = ((new_charges.loc["N",:] - charges_HSN.loc["N",:]).abs() >= 0.01) # regulatorily allowed
+        
         charges_HSN.loc["H",:] = new_charges.loc["H",:]
         charges_HSN.loc["N",:] = new_charges.loc["N",:]
+       
+        if (False): # additional devaite more away from legal extremes
+            charges_HSN.loc["H",:] = 2 *new_charges.loc["H",:]
+            charges_HSN.loc["N",:] = 0.5 * new_charges.loc["N",:]
+            
     else:
         different_charges = None
     
