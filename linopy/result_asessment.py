@@ -18,6 +18,8 @@ import matplotlib.colors as mcolors
 import matplotlib.cm as cm
 
 
+
+
 # read  results
 folder_name = "2025-11-20_02-00_spot_smart_only_EV_r100_v50_poly"
 
@@ -519,44 +521,40 @@ if (False):
 epoch_time = datetime(1970, 1, 1)
 
 folder_str = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results" + r"\\"
-    
+network_drive = r"\\wiwinf-file01.wiwinf.uni-due.de\home\hendrik.kramer" # r"Z:" 
+parameter_filepath_dsos = network_drive + r"\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
+timesteps = f_load.load_timesteps(parameters_opti["year"])
 
-# set sensi in parameters opti to true
-_, _, _, _, _, _, _, sensi_different = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti)
-sensi_different_list = list(sensi_different)
-sensi_different_list = [sensi_different_list[ct] for ct in list(parameters_opti["dso_subset"])] # Dimension stimmt nach Lauf nicht, dann nochmal die ersten Zeilen von main_script ausführen
+
 
 # regular
-spot_only_smart = r"2025-08-02_05-01_all_spot_smart_charging_only_EV_r100_v50_orig" + r"\\"                 
-mean_only_smart = r"2025-08-01_21-28_all_mean_smart_charging_only_EV_r100_v50_orig" + r"\\"
-# sensitivity
-spot_only_smart_sensi = r"2025-08-06_13-46_all_spot_smart_charging_only_EV_r100_v50_sensi" + r"\\"                 
-mean_only_smart_sensi = r"2025-08-07_08-53_all_mean_smart_charging_only_EV_r100_v50_sensi" + r"\\" 
+spot_only_smart = r"2025-11-21_00-39_spot_smart_only_EV_r100_v50_poly" + r"\\"                 
+# sensitivity regulatory
+spot_only_smart_sensi = r"2025-11-25_04-25_spot_smart_only_EV_r100_v50_sensi_regulatory" + r"\\"                 
+# sensitivity double
+spot_only_smart_sensi2 = r"2025-11-25_11-33_spot_smart_only_EV_r100_v50_sensi_double" + r"\\"                 
 
 # cost loading
-dso_x_ev = xr.open_dataarray(folder_str + mean_only_smart + "C_OP_ALL.nc").sel(s="red", r=sensi_different_list).size
-mean_ToU_c = xr.open_dataarray(folder_str + mean_only_smart + "C_OP_ALL.nc").sel(s="red", r=sensi_different_list).to_pandas().to_numpy().reshape(dso_x_ev)
-spot_ToU_c = xr.open_dataarray(folder_str + spot_only_smart + "C_OP_ALL.nc").sel(s="red", r=sensi_different_list).to_pandas().to_numpy().reshape(dso_x_ev)
-mean_ToU_sensi_c = xr.open_dataarray(folder_str + mean_only_smart_sensi + "C_OP_ALL.nc").sel(s="red", r=sensi_different_list).to_pandas().to_numpy().reshape(dso_x_ev)
-spot_ToU_sensi_c = xr.open_dataarray(folder_str + spot_only_smart_sensi + "C_OP_ALL.nc").sel(s="red", r=sensi_different_list).to_pandas().to_numpy().reshape(dso_x_ev)
-cost_sensi = pd.DataFrame({'static base case':mean_ToU_c, 'static sensitivity':mean_ToU_sensi_c, 'dynamic base case':spot_ToU_c, 'dynamic sensitivity': spot_ToU_sensi_c})
+dso_x_ev = xr.open_dataarray(folder_str + spot_only_smart + "C_ALL.nc").sel(s="red").size
+spot_ToU_c = xr.open_dataarray(folder_str + spot_only_smart + "C_ALL.nc").sel(s="red").to_pandas().to_numpy().reshape(dso_x_ev)
+spot_ToU_sensi_c = xr.open_dataarray(folder_str + spot_only_smart_sensi + "C_ALL.nc").sel(s="red").to_pandas().to_numpy().reshape(dso_x_ev)
+spot_ToU_sensi_c2 = xr.open_dataarray(folder_str + spot_only_smart_sensi2 + "C_ALL.nc").sel(s="red").to_pandas().to_numpy().reshape(dso_x_ev)
+
+cost_sensi = pd.DataFrame({'base case':spot_ToU_c, 'regulatory limit': spot_ToU_sensi_c,'Half and double':spot_ToU_sensi_c2}) / 100  # ct --> Euro
 # no linebreak space between "base" and "case"
 
 # power consumption loading
-mean_ToU = xr.open_dataarray(folder_str + mean_only_smart + "P_BUY.nc").sel(s="red", r=sensi_different_list).sum(["v"]).mean(["r"]).to_pandas()
-spot_ToU = xr.open_dataarray(folder_str + spot_only_smart + "P_BUY.nc").sel(s="red", r=sensi_different_list).sum(["v"]).mean(["r"]).to_pandas()
-mean_ToU_sensi = xr.open_dataarray(folder_str + mean_only_smart_sensi + "P_BUY.nc").sel(s="red", r=sensi_different_list).sum(["v"]).mean(["r"]).to_pandas()
-spot_ToU_sensi = xr.open_dataarray(folder_str + spot_only_smart_sensi + "P_BUY.nc").sel(s="red", r=sensi_different_list).sum(["v"]).mean(["r"]).to_pandas()
-
+spot_ToU = xr.open_dataarray(folder_str + spot_only_smart + "P_HOME.nc").sel(s="red").mean(["v"]).mean(["r"]).to_pandas()
+spot_ToU_sensi = xr.open_dataarray(folder_str + spot_only_smart_sensi + "P_HOME.nc").sel(s="red").mean(["v"]).mean(["r"]).to_pandas()
+spot_ToU_sensi2 = xr.open_dataarray(folder_str + spot_only_smart_sensi2 + "P_HOME.nc").sel(s="red").mean(["v"]).mean(["r"]).to_pandas()
 
 pd_ct = pd.DataFrame()
 
-pd_ct["smart ToU static original"] = mean_ToU 
-pd_ct["smart ToU static new"] = mean_ToU_sensi
-pd_ct["smart ToU dynamic original"] = spot_ToU 
-pd_ct["smart ToU dynamic new"] = spot_ToU_sensi
-    
-dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(folder_str + mean_only_smart + "P_BUY.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+pd_ct["Base case"] = spot_ToU 
+pd_ct["Regulatory limit"] = spot_ToU_sensi
+pd_ct["Half and double"] = spot_ToU_sensi2
+
+dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(folder_str + spot_only_smart + "P_HOME.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
 pd_ct = pd_ct.set_index(dti)
 pd_ct["hour decimal"] = pd_ct.index.hour + pd_ct.index.minute/60
 
@@ -570,40 +568,42 @@ pd_day = pd_ct.groupby(["hour decimal"]).mean()
 # kW reduction plots
 if (False):
 
-    fig_sensi, axs_sensi = plt.subplots(ncols=2, figsize=(15, 6))   
+    fig_sensi, axs_sensi = plt.subplots(ncols=2, figsize=(15, 6), gridspec_kw={'width_ratios': [0.6, 0.4]})   
 
 
-    # LINKER PLOT
+    # RECHTER PLOT
     meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black') #firebrick
     flierprops = dict(marker='o', markerfacecolor=(0,0,0,0), markersize=6, markeredgecolor=(0,0,0,0))  # set to transparent
-    cost_sensi.plot(ax = axs_sensi[0],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    axs_sensi[0].set_ylabel("Cost for end-consumers in €", fontsize=20)
-    axs_sensi[0].set_xticklabels(cost_sensi.columns.str.replace(" ","\n"), fontsize=20)
-    axs_sensi[0].set_ylim(50, 450)
+    cost_sensi.plot(ax = axs_sensi[1],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
+    axs_sensi[1].set_ylabel("Cost in €", fontsize=20)
+    axs_sensi[1].set_xticklabels(cost_sensi.columns.str.replace(" ","\n"), fontsize=20)
+    axs_sensi[1].set_ylim(-3, 125)
 
 
-    axs_sensi[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
-    axs_sensi[0].tick_params(axis='both', labelsize=20)
-
-
-    #  RECHTER PLOT
-    linestyle_list =  ['-', '--', '-', '--']  # same length as columns
-    color_list = ["#8b3003", "#c13f1a", "#00386c", "#0087ff"]
-    axs_sensi[1].plot(pd_day["smart ToU static new"] - pd_day["smart ToU static original"], linestyle=linestyle_list[0], color=color_list[0], alpha=1, linewidth=1,  zorder=2, label="static electricity prices \n(sensitivity minus base case)")
-    axs_sensi[1].plot(pd_day["smart ToU dynamic new"] - pd_day["smart ToU dynamic original"], linestyle=linestyle_list[2], color=color_list[2], alpha=1, zorder=1, linewidth=1, label="dynamic electricity prices \n(sensitivity minus base case)")
-
-    axs_sensi[1].legend(fontsize=16, ncols=1, loc="upper right")
-
-        
-    axs_sensi[1].set_ylim(-1, 1)
-    axs_sensi[1].set_xlabel("Time in hours", fontsize=20)
-    axs_sensi[1].set_ylabel("Mean power change \n of 50 EV in kW", fontsize=20)
-    axs_sensi[1].set_ylim(-0.35, 0.35)
-    axs_sensi[1].tick_params(axis='both', labelsize=20)
-    axs_sensi[1].set_xlim(0, 24)
-    axs_sensi[1].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
-    axs_sensi[1].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
     axs_sensi[1].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
+    axs_sensi[1].tick_params(axis='both', labelsize=20)
+    axs_sensi[1].set_title("(b) Cost for end-consumers", fontsize=20)
+
+
+
+    #  LINKER PLOT
+    axs_sensi[0].plot(pd_day["Base case"], linestyle="-", alpha=1, linewidth=5,  zorder=0, color="lightgray", label="Base case")
+    axs_sensi[0].plot(pd_day["Regulatory limit"], linestyle="-", alpha=1, linewidth=3, color="darkgray", zorder=1, label="Regulatory limit")
+    axs_sensi[0].plot(pd_day["Half and double"], linestyle="-", alpha=1, zorder=2, linewidth=1, color="dimgrey", label= "Half and double")
+
+    axs_sensi[0].legend(fontsize=16, ncols=1, loc="upper right")
+
+    axs_sensi[0].set_title("(a) Mean charge power during all seasons", fontsize=20)
+
+    axs_sensi[0].set_ylim(-1, 1)
+    axs_sensi[0].set_xlabel("Time in hours", fontsize=20)
+    axs_sensi[0].set_ylabel("Power in kW", fontsize=20)
+    axs_sensi[0].set_ylim(-0.05, 0.63)
+    axs_sensi[0].tick_params(axis='both', labelsize=20)
+    axs_sensi[0].set_xlim(0, 24)
+    axs_sensi[0].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
+    axs_sensi[0].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
+    axs_sensi[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
 
     plt.tight_layout()
     plt.show()
@@ -611,74 +611,9 @@ if (False):
     fig_sensi.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\sensitivity_test.svg")
 
 
-# ========================
-# Quantile Plot
-# ========================
-
-bla = xr.open_dataarray(spot_only_charge + variable_file).sel(s="red")
-bla = bla.drop_vars('s')
-bla2 = bla.sum("v") / (50*11)
-#bla2 = bla.stack(new_dim=('r', 'v'))
-#bla2 = bla2.drop_vars('v')
-
-multi_index = pd.MultiIndex.from_arrays(
-        [
-            dti.date,
-            dti.hour + dti.minute / 60,
-        ],
-        names=["d", "qh"],
-    )
-bla2["t"] = multi_index
-bla3 = bla2.drop_duplicates('t').unstack("t")
-
-
-
-bla3 = bla3.isel(r=1) # nur westnetz
-pd_bla_quantile = bla3.quantile(q=[1, 0.99, 0.95, 0.9, 0.8], dim="d").to_pandas().transpose()
-
-# Simultanes Laden
-#bla4 = bla3.to_pandas()
-#bla5 = 1*(bla4 > 0)
-#pd_bla_quantile = bla5.quantile(q=[1, 0.99, 0.95, 0.9, 0.8]).transpose()
-
-
-df = pd_bla_quantile  # Form: Zeilen = qh, Spalten = Quantile (z.B. 0.90, 0.95, 0.98, 0.99)
-
-# Spalten nach ihrem Quantilwert aufsteigend sortieren: niedrigstes Quantil unten, höchstes oben
-cols = sorted(df.columns, key=float)
-x = df.index.values  # qh-Werte
-
-
-fig, ax = plt.subplots()
-
-# Alpha-Werte: unten voll deckend, nach oben zunehmend transparenter
-n = len(cols)
-alphas = np.linspace(1.0, 0.2, n)  # z.B. linear von 1.0 (unten) zu 0.2 (oben)
-
-y_prev = np.zeros_like(x, dtype=float)
-for k, col in enumerate(cols):
-    y = df[col].values
-    # Fläche zwischen vorheriger und aktueller Linie
-    ax.fill_between(x, y_prev, y, color='blue', alpha=alphas[k], linewidth=0)
-    # Schwarze Linie mit 0.5 Breite
-    ax.plot(x, y, color='black', linewidth=0.5)
-    y_prev = y
-
-ax.set_xlabel('qh')
-ax.set_ylabel('solution')
-from matplotlib.patches import Patch
-r, g, b = mcolors.to_rgb('blue')
-handles = [
-    Patch(facecolor=(r, g, b, alphas[k]), edgecolor='black', linewidth=0.5, label=f"q = {cols[k]:g}")
-    for k in range(n)
-]
-handles = handles[::-1]
-ax.legend(handles=handles, title='Quantile', loc='best')
-
-plt.show()
 
 # ====================================
-# Plots Simultane Nutzung
+# Plots Simultane Nutzung, Quantile Plot
 # ===================================
 
 

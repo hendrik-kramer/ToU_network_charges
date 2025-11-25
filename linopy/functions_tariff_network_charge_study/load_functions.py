@@ -200,6 +200,7 @@ def load_network_charges(input_filepath, timesteps, parameters_opti):
         charges_HSN.loc["N",:] = new_charges.loc["N",:]
        
         if (False): # additional devaite more away from legal extremes
+            print("Double the extreme ToU segment network charge cost")
             charges_HSN.loc["H",:] = 2 *new_charges.loc["H",:]
             charges_HSN.loc["N",:] = 0.5 * new_charges.loc["N",:]
             

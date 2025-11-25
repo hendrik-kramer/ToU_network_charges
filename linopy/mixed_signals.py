@@ -15,22 +15,44 @@ from datetime import date, timedelta, datetime
 import numpy as np
 import xarray as xr
 from pathlib import Path
-import matplotlib.colors as (mcolors, ListedColormap)
+#import matplotlib.colors as (mcolors, ListedColormap)
+import matplotlib.colors as mcolors
+from matplotlib.colors import ListedColormap
 from matplotlib.ticker import (AutoMinorLocator, MultipleLocator)
 from matplotlib.collections import LineCollection
 import matplotlib.patches as mpatches
 import matplotlib.cm as cm
-
-
 
 import glob
 import os
 import warnings
 import re
 
-#from statistics import linear_regression
-
 import functions_tariff_network_charge_study.load_functions as f_load
+
+
+
+charge_strategy = "smart"  # "smart", "scheduled", "immediate"
+weight_lookup = {"smart":{"weight_time_preference":0, "weight_only_low_segment":0},
+                 "scheduled":{"weight_time_preference":1, "weight_only_low_segment":9999},
+                 "immediate":{"weight_time_preference":1, "weight_only_low_segment":0}}
+parameters_opti = {
+    "prices": "spot", # "spot", "mean"
+    "year":2024,
+    "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
+    "emob_subset" : range(0,50),
+    "settings_setup": "only_EV", # "only_EV", # "prosumage"
+    "network_charges_sensisitity_study": False, # change settings  in the load function possible (works only for smart and spot)
+    "auction": "da_auction_hourly_12_uhr_cubic",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
+    "quarter" : "all", # "Q1", "Q2, ...
+    # relevant after STRISE sconferece
+    "penalty_no_charge_before_arrival": 9999,
+    "penalty_no_st_ht": 999,
+    "weight_no_charge_before_arrival" : 1, #999999,  # prevent charging at noon when new information is revealed  
+    "weight_only_low_segment" : weight_lookup[charge_strategy]["weight_only_low_segment"], #999,
+    "weight_time_preference" : weight_lookup[charge_strategy]["weight_time_preference"], #99,
+    }
+
 
 
 
@@ -52,24 +74,25 @@ modul1_values.name = None
 meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black', markersize=4) #firebrick
 
 
-# Figure und Subplots (vertikal)
-fig_input_boxplot, axs_input_boxplots = plt.subplots(2, 1, figsize=(6, 3))
-
-# Erster Boxplot, horizontal
-st_values.plot(ax=axs_input_boxplots[0], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
-axs_input_boxplots[0].set_title('Standard network charge in ct/kWh', fontsize=16)
-axs_input_boxplots[0].grid(which='major', axis='x', linestyle='--', color="lightgray")
-
-# Zweiter Boxplot, horizontal
-modul1_values.plot(ax=axs_input_boxplots[1], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
-axs_input_boxplots[1].set_title('Annual network charge reduction in € (after tax)', fontsize=16)
-axs_input_boxplots[1].grid(which='major', axis='x', linestyle='--', color="lightgray")
-
-plt.tight_layout()
-plt.show()
-
-fig_input_boxplot.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\input_boxplots.svg", format="svg")
-
+if (False):
+    # Figure und Subplots (vertikal)
+    fig_input_boxplot, axs_input_boxplots = plt.subplots(2, 1, figsize=(6, 3))
+    
+    # Erster Boxplot, horizontal
+    st_values.plot(ax=axs_input_boxplots[0], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+    axs_input_boxplots[0].set_title('Standard network charge in ct/kWh', fontsize=16)
+    axs_input_boxplots[0].grid(which='major', axis='x', linestyle='--', color="lightgray")
+    
+    # Zweiter Boxplot, horizontal
+    modul1_values.plot(ax=axs_input_boxplots[1], kind="box", vert=False, patch_artist=True, widths=0.7, notch=True, showmeans=True, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+    axs_input_boxplots[1].set_title('Annual network charge reduction in € (after tax)', fontsize=16)
+    axs_input_boxplots[1].grid(which='major', axis='x', linestyle='--', color="lightgray")
+    
+    plt.tight_layout()
+    plt.show()
+    
+    fig_input_boxplot.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\input_boxplots.svg", format="svg")
+    
 
 
 
@@ -84,117 +107,113 @@ filename_prices = r"Z:\10_Paper\13_Alleinautorenpaper\daten_input\preise\da_aukt
 # ====================================
 # === BOX PLOT INPUT SPOT PRICES ====
 # ====================================
-
-all_prices = pd.read_csv(filename_prices, skiprows=1).rename(columns={"Unnamed: 0":"time_utc", "Preis (EUR/MWh, EUR/tCO2)":"spot_signal_EUR_MWh"})
-all_prices["time_utc"] = pd.to_datetime(all_prices["time_utc"], utc=True).dt.tz_convert("Europe/Berlin")
-all_prices["spot_signal_ct_kWh"] = all_prices["spot_signal_EUR_MWh"]/10
-all_prices['Time_DE'] = pd.to_datetime(all_prices["time_utc"]).dt.tz_convert('Europe/Berlin')
-all_prices['iso_year'] = all_prices['Time_DE'].dt.isocalendar().year
-all_prices['iso_week'] = all_prices['Time_DE'].dt.isocalendar().week
-all_prices["Delivery day"] = pd.to_datetime(all_prices['Time_DE'].dt.date).astype(str)
-all_prices["time"] = all_prices['Time_DE'].dt.time.astype(str)
-
-all_prices_2024 = all_prices[all_prices["Time_DE"].dt.year==2024]
-all_prices_2018_2024 = all_prices[(all_prices["Time_DE"].dt.year>=2018) & (all_prices["Time_DE"].dt.year<=2024)]
+if (False):
+    all_prices = pd.read_csv(filename_prices, skiprows=1).rename(columns={"Unnamed: 0":"time_utc", "Preis (EUR/MWh, EUR/tCO2)":"spot_signal_EUR_MWh"})
+    all_prices["time_utc"] = pd.to_datetime(all_prices["time_utc"], utc=True).dt.tz_convert("Europe/Berlin")
+    all_prices["spot_signal_ct_kWh"] = all_prices["spot_signal_EUR_MWh"]/10
+    all_prices['Time_DE'] = pd.to_datetime(all_prices["time_utc"]).dt.tz_convert('Europe/Berlin')
+    all_prices['iso_year'] = all_prices['Time_DE'].dt.isocalendar().year
+    all_prices['iso_week'] = all_prices['Time_DE'].dt.isocalendar().week
+    all_prices["Delivery day"] = pd.to_datetime(all_prices['Time_DE'].dt.date).astype(str)
+    all_prices["time"] = all_prices['Time_DE'].dt.time.astype(str)
     
-all_prices_pivot_2024 = all_prices_2024.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
-all_prices_pivot_2018_2024  = all_prices_2018_2024.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
-
-# put evening hours up front
-# deduce mean of planning period 35 h
-all_prices_pivot_shifted_2024 = pd.concat([all_prices_pivot_2024.iloc[:,13:24], all_prices_pivot_2024.iloc[:,0:24].shift(-1), ], axis=1)
-all_prices_pivot_shifted_2018_2024 = pd.concat([all_prices_pivot_2018_2024.iloc[:,13:24], all_prices_pivot_2018_2024.iloc[:,0:24].shift(-1), ], axis=1)
-
-all_prices_pivot_shifted_daily_mean_2024 = all_prices_pivot_shifted_2024.mean(axis=1)
-all_prices_pivot_shifted_daily_mean_2018_2024 = all_prices_pivot_shifted_2018_2024.mean(axis=1)
-
-all_prices_pivot_minus_mean_2024 = all_prices_pivot_2024.sub(all_prices_pivot_shifted_daily_mean_2024, axis="rows")
-all_prices_pivot_minus_mean_2018_2024 = all_prices_pivot_2018_2024.sub(all_prices_pivot_shifted_daily_mean_2018_2024, axis="rows")
-
-all_prices_pivot_minus_mean_2024 = all_prices_pivot_minus_mean_2024.fillna(0) # quickfix timeshift none -> zero, otherwise no violin
-all_prices_pivot_minus_mean_2018_2024 = all_prices_pivot_minus_mean_2018_2024.fillna(0)  # quickfix timeshift none -> zero, otherwise no violin
-
-#meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black', markersize=4) #firebrick
-#ax_signal = all_prices_pivot_minus_mean.plot(ax=ax_signal, kind="box", whis=(10, 90), patch_artist=True, widths=0.8, notch=True, showmeans=False, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
-
- 
-def add_label(violin, label): # to make dummy legend for violin plots
-    color = violin["bodies"][0].get_facecolor().flatten()
-    labels.append((mpatches.Patch(color=color), label))
-
-
-fig_signal, ax_signal = plt.subplots(nrows=1, ncols=1, figsize=(16, 5))
-
-
-parts_2024  = ax_signal.violinplot(all_prices_pivot_minus_mean_2024, showextrema=False, showmedians=True, side='low', widths=0.8)  # left side only 2024
-parts_2018_2024  = ax_signal.violinplot(all_prices_pivot_minus_mean_2018_2024, showextrema=False, showmedians=True, side='high', widths=0.8)# left side all years 2018-2024
-
-
-
-# layout violin plots
-for pc in parts_2024['bodies']:
-    pc.set_facecolor('darkgray')
-    #pc.set_edgecolor('black')
-    #pc.set_linewidth(0.8)
-    pc.set_alpha(1)
+    all_prices_2024 = all_prices[all_prices["Time_DE"].dt.year==2024]
+    all_prices_2018_2024 = all_prices[(all_prices["Time_DE"].dt.year>=2018) & (all_prices["Time_DE"].dt.year<=2024)]
+        
+    all_prices_pivot_2024 = all_prices_2024.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
+    all_prices_pivot_2018_2024  = all_prices_2018_2024.pivot_table(index="Delivery day", columns="time", values="spot_signal_ct_kWh", aggfunc='mean')  # if hour is duplicate (time shift) use mean:
     
-parts_2024['cmedians'].set_edgecolor('black')
-parts_2024['cmedians'].set_linewidth(1)
-parts_2024['cmedians'].set_alpha(1)
+    # put evening hours up front
+    # deduce mean of planning period 35 h
+    all_prices_pivot_shifted_2024 = pd.concat([all_prices_pivot_2024.iloc[:,13:24], all_prices_pivot_2024.iloc[:,0:24].shift(-1), ], axis=1)
+    all_prices_pivot_shifted_2018_2024 = pd.concat([all_prices_pivot_2018_2024.iloc[:,13:24], all_prices_pivot_2018_2024.iloc[:,0:24].shift(-1), ], axis=1)
     
-for pc in parts_2018_2024['bodies']:
-    pc.set_facecolor('lightgray')
-    #pc.set_edgecolor('black')
-    #pc.set_linewidth(0.8)
-    pc.set_alpha(1)
-
-parts_2018_2024['cmedians'].set_edgecolor('black')
-parts_2018_2024['cmedians'].set_linewidth(1)
-parts_2018_2024['cmedians'].set_alpha(1)
-
-#ax_singal2 = q95.plot(ax=ax_signal, x="index", y=0.95, kind="scatter", marker="_", color="k", zorder=2, s=150)
-#ax_singal2.xaxis.set_visible(False)
-#ax_singal3 = q05.plot(ax=ax_signal, x="index", y=0.05, kind="scatter", marker="_", color="k", zorder=2, s=150)
-#ax_singal3.set_xticklabels(q05["hour_str"])
-
-ax_signal.xaxis.set_visible(True)
-#ax_signal.set_xticklabels(list(q05["hour_str"]))
-
-ax_signal.grid(which='major', axis='y', linestyle='--', color="darkgray")
-ax_signal.set_ylabel("Price difference in ct/kWh", fontsize=my_fontsize)
-ax_signal.set_xlabel("Hour of the day", fontsize=my_fontsize)
-
-ax_signal.set_yticks([-20, -15, -10, -5, 0, 5, 10, 15, 20])
-ax_signal.set_ylim(-20,20)
-ax_signal.set_yticklabels(ax_signal.get_yticklabels(), fontsize=my_fontsize)
-
-ax_signal.set_xticks(np.arange(1, 25))
-ax_signal.set_xlim(0.5,24.5)
-ax_signal.set_xticklabels(ax_signal.get_xticklabels(), fontsize=my_fontsize)
-
-# horizontal zero line
-ax_signal.hlines(y=[0], xmin=-1, xmax=24, colors=['lightgray'], linestyles=['-'], linewidth=2, zorder=0)
-
-
-labels = [] # reset
-add_label(parts_2024, "2024")    
-add_label(parts_2018_2024, "2018 - 2024")    
-
-plt.legend(*zip(*labels), loc="upper left", ncols=2, fontsize=my_fontsize)
-
-
-
-fig_signal.tight_layout()
-
-
-
-fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_da_spot_signal_2018_2024_violin.svg", format="svg")
+    all_prices_pivot_shifted_daily_mean_2024 = all_prices_pivot_shifted_2024.mean(axis=1)
+    all_prices_pivot_shifted_daily_mean_2018_2024 = all_prices_pivot_shifted_2018_2024.mean(axis=1)
+    
+    all_prices_pivot_minus_mean_2024 = all_prices_pivot_2024.sub(all_prices_pivot_shifted_daily_mean_2024, axis="rows")
+    all_prices_pivot_minus_mean_2018_2024 = all_prices_pivot_2018_2024.sub(all_prices_pivot_shifted_daily_mean_2018_2024, axis="rows")
+    
+    all_prices_pivot_minus_mean_2024 = all_prices_pivot_minus_mean_2024.fillna(0) # quickfix timeshift none -> zero, otherwise no violin
+    all_prices_pivot_minus_mean_2018_2024 = all_prices_pivot_minus_mean_2018_2024.fillna(0)  # quickfix timeshift none -> zero, otherwise no violin
+    
+    #meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black', markersize=4) #firebrick
+    #ax_signal = all_prices_pivot_minus_mean.plot(ax=ax_signal, kind="box", whis=(10, 90), patch_artist=True, widths=0.8, notch=True, showmeans=False, meanprops=meanpointprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"), showfliers=False, fontsize=20)
+    
+     
+    def add_label(violin, label): # to make dummy legend for violin plots
+        color = violin["bodies"][0].get_facecolor().flatten()
+        labels.append((mpatches.Patch(color=color), label))
+    
+    
+    fig_signal, ax_signal = plt.subplots(nrows=1, ncols=1, figsize=(16, 5))
+    
+    
+    parts_2024  = ax_signal.violinplot(all_prices_pivot_minus_mean_2024, showextrema=False, showmedians=True, side='low', widths=0.8)  # left side only 2024
+    parts_2018_2024  = ax_signal.violinplot(all_prices_pivot_minus_mean_2018_2024, showextrema=False, showmedians=True, side='high', widths=0.8)# left side all years 2018-2024
+    
+    
+    
+    # layout violin plots
+    for pc in parts_2024['bodies']:
+        pc.set_facecolor('darkgray')
+        #pc.set_edgecolor('black')
+        #pc.set_linewidth(0.8)
+        pc.set_alpha(1)
+        
+    parts_2024['cmedians'].set_edgecolor('black')
+    parts_2024['cmedians'].set_linewidth(1)
+    parts_2024['cmedians'].set_alpha(1)
+        
+    for pc in parts_2018_2024['bodies']:
+        pc.set_facecolor('lightgray')
+        #pc.set_edgecolor('black')
+        #pc.set_linewidth(0.8)
+        pc.set_alpha(1)
+    
+    parts_2018_2024['cmedians'].set_edgecolor('black')
+    parts_2018_2024['cmedians'].set_linewidth(1)
+    parts_2018_2024['cmedians'].set_alpha(1)
+    
+    #ax_singal2 = q95.plot(ax=ax_signal, x="index", y=0.95, kind="scatter", marker="_", color="k", zorder=2, s=150)
+    #ax_singal2.xaxis.set_visible(False)
+    #ax_singal3 = q05.plot(ax=ax_signal, x="index", y=0.05, kind="scatter", marker="_", color="k", zorder=2, s=150)
+    #ax_singal3.set_xticklabels(q05["hour_str"])
+    
+    ax_signal.xaxis.set_visible(True)
+    #ax_signal.set_xticklabels(list(q05["hour_str"]))
+    
+    ax_signal.grid(which='major', axis='y', linestyle='--', color="darkgray")
+    ax_signal.set_ylabel("Price difference in ct/kWh", fontsize=my_fontsize)
+    ax_signal.set_xlabel("Hour of the day", fontsize=my_fontsize)
+    
+    ax_signal.set_yticks([-20, -15, -10, -5, 0, 5, 10, 15, 20])
+    ax_signal.set_ylim(-20,20)
+    ax_signal.set_yticklabels(ax_signal.get_yticklabels(), fontsize=my_fontsize)
+    
+    ax_signal.set_xticks(np.arange(1, 25))
+    ax_signal.set_xlim(0.5,24.5)
+    ax_signal.set_xticklabels(ax_signal.get_xticklabels(), fontsize=my_fontsize)
+    
+    # horizontal zero line
+    ax_signal.hlines(y=[0], xmin=-1, xmax=24, colors=['lightgray'], linestyles=['-'], linewidth=2, zorder=0)
+    
+    
+    labels = [] # reset
+    add_label(parts_2024, "2024")    
+    add_label(parts_2018_2024, "2018 - 2024")    
+    
+    plt.legend(*zip(*labels), loc="upper left", ncols=2, fontsize=my_fontsize)
+    
+    fig_signal.tight_layout()    
+    
+    fig_signal.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\hourly_da_spot_signal_2018_2024_violin.svg", format="svg")
 
 
 
 
 # ==============================================
-# ===== MIXED SIGNALS HEATMAP + CENTROIDS =====  // SET SENSITIVITY STUDY = FALSE
+# ===== MIXED SIGNALS HEATMAP =====  // SET SENSITIVITY STUDY = FALSE
 # ==============================================
 
 # load all 
@@ -269,16 +288,19 @@ critical_steps.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso
 x_vals = []
 y_vals = []
 for ct_dsos in network_charges_signal.columns:
-    htnt = (network_charges_signal[ct_dsos] != 0)
-    y_vals.extend(list( network_charges_signal[ct_dsos][htnt.values]))
-    x_vals.extend(list( all_prices_minus_mean_15min["spot_signal_ct_kWh"][htnt.values]))
+    #htnt = (network_charges_signal[ct_dsos] != 0)
+    #y_vals.extend(list( network_charges_signal[ct_dsos][htnt.values]))
+    #x_vals.extend(list( all_prices_minus_mean_15min["spot_signal_ct_kWh"][htnt.values]))
+
+    y_vals.extend(list( network_charges_signal[ct_dsos][:]))
+    x_vals.extend(list( all_prices_minus_mean_15min["spot_signal_ct_kWh"][:]))
 
 pd_all_data = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
 
 
 # ===== only 2024 =====
 this_year = 2024
-all_years = False
+all_years = True
 
 def get_shares(this_year, network_charges_signal, all_prices_minus_mean_15min):
     
@@ -298,7 +320,7 @@ def get_shares(this_year, network_charges_signal, all_prices_minus_mean_15min):
     x_vals = np.array(x_vals)
     y_vals = np.array(y_vals)
     
-    pd_all_data_one_year = pd.DataFrame({'xvals':x_vals_one_year, 'yvals': y_vals_one_year}).dropna(subset = ['xvals', 'yvals'])
+    pd_all_data_one_year = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
     
     q1_market = int(100*np.round(np.mean((x_vals > 0) & (y_vals > 0) & (x_vals > y_vals)),2))
     q1_network = int(100*np.round(np.mean((x_vals > 0) & (y_vals > 0) & (x_vals < y_vals)),2))
@@ -343,7 +365,7 @@ y_bins = int(np.round(2*yy))
 #ax_ssc.set_ylim(-yy,yy)
 
 # create gridded heatmap
-heatmap, xedges, yedges = np.histogram2d(pd_all_data_one_year.xvals, pd_all_data_one_year.yvals, range=[(-xx,xx),(-yy,yy)], bins=[x_bins,y_bins])
+heatmap, xedges, yedges = np.histogram2d(pd_all_data.xvals, pd_all_data.yvals, range=[(-xx,xx),(-yy,yy)], bins=[x_bins,y_bins])
 heatmap = np.where(heatmap==0, np.nan, heatmap).T
 extent = [xedges[0], xedges[-1], yedges[0], yedges[-1]]
 
@@ -355,7 +377,7 @@ newcolors[:1, :] = (0.75, 0.75, 0.75, 0.5)
 cmap_newgreens = ListedColormap(newcolors)
 
 
-hist_signal = ax_ssc.imshow(heatmap, extent=extent, cmap=cmap_newgreens) #viridis_r  #origin='lower', 
+hist_signal = ax_ssc.imshow(heatmap, extent=extent, cmap=cmap_newgreens, origin="lower") #viridis_r  #origin='lower', 
 
 
 ax_ssc.set_aspect('equal',adjustable='box')
@@ -365,11 +387,11 @@ ax_ssc.tick_params(axis='y', labelsize=my_fontsize)
 
 # add colorbar
 cbar = fig_signal_scatter.colorbar(hist_signal, orientation="vertical")
-cbar.set_label("Data observations per bin", fontsize=my_fontsize)
+cbar.set_label("Data pairs per bin", fontsize=my_fontsize)
 ticklabs = cbar.ax.get_yticklabels()
 cbar.ax.set_yticklabels(ticklabs, fontsize=my_fontsize) 
-cbar.ax.yaxis.set_ticks([0, 5e3, 10e3, 15e3, 20e3, 25e3])
-cbar.ax.set_yticklabels(['0', '5k', '10k', '15k', '20k', '25k'])
+cbar.ax.yaxis.set_ticks([0, 50e3, 100e3, 150e3, 200e3, 250e3])
+cbar.ax.set_yticklabels(['0', '50k', '100k', '150k', '200k', '250k'])
 
 cbar.ax.tick_params(labelsize=my_fontsize)
 
@@ -378,14 +400,14 @@ ax_ssc.vlines(x=[0], ymin=-yy, ymax=yy, colors=['gray'], linestyles=['--'], line
 ax_ssc.axline([-yy, -yy], [yy, yy], color="gray", linestyle="--", linewidth=2)
 ax_ssc.axline([yy, -yy], [-yy, yy], color="gray", linestyle="--", linewidth=2)
 
-ax_ssc.annotate(r'$\text{II}_{market}$' + "\n" + str(q2_market) + " %",(-14.8, 1.5), fontsize=16)
-ax_ssc.annotate(r'$\text{II}_{network}$' + "\n" + str(q2_network) + " %",(-9.8, 11.5), fontsize=16)
-ax_ssc.annotate(r'$\text{I}_{network}$' + "\n" + str(q1_network) + " %",(5.2, 11.5) , fontsize=16)
-ax_ssc.annotate(r'$\text{I}_{market}$' + "\n" + str(q1_market) + " %",(20.2, 11.5), fontsize=16)
-ax_ssc.annotate(r'$\text{III}_{market}$' + "\n" + str(q3_market) + " %",(-14.8, -9), fontsize=16)
-ax_ssc.annotate(r'$\text{III}_{network}$' + "\n" + str(q3_network) + " %",(-9.8, -14), fontsize=16)
-ax_ssc.annotate(r'$\text{IV}_{network}$' + "\n" + str(q4_network) + " %",(5.2, -14), fontsize=16)
-ax_ssc.annotate(r'$\text{IV}_{market}$' + "\n" + str(q4_market) + " %",(10.2, -9), fontsize=16)
+ax_ssc.text(-12.5, 7.5, r'$\text{II}_{market}$' + "\n" + str(q2_market) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(-7.5, 12.5, r'$\text{II}_{network}$' + "\n" + str(q2_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(7.5, 12.5, r'$\text{I}_{network}$' + "\n" + str(q1_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(12.5, 7.5, r'$\text{I}_{market}$' + "\n" + str(q1_market) + " %",fontsize=16, ha='center', va='center')
+ax_ssc.text(-17.5, -7.5, r'$\text{III}_{market}$' + "\n" + str(q3_market) + " %",fontsize=16, ha='center', va='center')
+ax_ssc.text(-7.5, -12.5, r'$\text{III}_{network}$' + "\n" + str(q3_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(12.5, -7.5, r'$\text{IV}_{market}$' + "\n" + str(q4_market) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(7.5, -12.5, r'$\text{IV}_{network}$' + "\n" + str(q4_network) + " %", fontsize=16, ha='center', va='center')
 
 
 # Change major ticks to show every 20.
@@ -394,12 +416,14 @@ ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
 
 ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
 
-ax_ssc.set_xlabel("Market signal in ct/kWh \n \xa0 \n lower  ← | → higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
-ax_ssc.set_ylabel("Network signal in ct/kWh \n \xa0 \n Low – Standard  ← | → High – Standard",  fontsize=my_fontsize)
+ax_ssc.set_xlabel("Market signal in ct/kWh \n \xa0 \n lower  ←|→ higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
+ax_ssc.set_ylabel("Low – Standard  ←|→ High – Standard \n \xa0 \n   Network signal in ct/kWh",  fontsize=my_fontsize)
 
 ax_ssc.set_xlim(xmin=-xx, xmax=xx)
 ax_ssc.set_ylim(-yy,yy)
 
+from scipy.stats import pearsonr
+corr_coef, _ = pearsonr(pd_all_data.xvals, pd_all_data.yvals)
 
 fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_da_signals.svg", format="svg")
 
@@ -407,17 +431,13 @@ fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_networ
 
 # ===== HEATMAP PLOT, 2018 - 2023 ===== 
 
+
+from matplotlib.patches import Polygon
+from matplotlib.colors import Normalize
+from matplotlib.cm import ScalarMappable
+
+
 my_fontsize = 20
-
-#arr = np.array([
-#    [0.15, 0.10, 0.05, 0.20, 0.25, 0.10, 0.05, 0.10],
-#    [0.33, 0.17, 0.10, 0.08, 0.12, 0.08, 0.07, 0.05],
-#    [0.05, 0.15, 0.25, 0.15, 0.05, 0.15, 0.05, 0.10],
-#    [0.20, 0.20, 0.15, 0.15, 0.05, 0.15, 0.05, 0.05],
-#    [0.40, 0.15, 0.05, 0.05, 0.05, 0.05, 0.10, 0.15],
-#    [0.10, 0.10, 0.20, 0.10, 0.20, 0.15, 0.05, 0.10]
-#])
-
 arr = np.empty((6, 8))
 
 years = [2018, 2019, 2020, 2021, 2022, 2023]
@@ -506,7 +526,7 @@ cbar = plt.colorbar(sm, ax=axR, orientation='vertical')
 cbar.set_ticks([0.0, 0.1, 0.2, 0.3, 0.4, 0.5])
 cbar.set_ticklabels(['0%', '10%', '20%', '30%', '40%', '50%'])
 cbar.ax.tick_params(labelsize=my_fontsize)
-cbar.set_label('Value', fontsize=my_fontsize)
+cbar.set_label('Data pairs (relative)', fontsize=my_fontsize)
 
 plt.show()
 

@@ -53,7 +53,7 @@ parameters_opti = {
     "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,50),
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
-    "network_charges_sensisitity_study": False,
+    "network_charges_sensisitity_study": False, # change settings  in the load function possible (works only for smart and spot)
     "auction": "da_auction_hourly_12_uhr_cubic",  # "da_auction_hourly_12_uhr_linInterpol", "da_auction_hourly_12_uhr_stairs", "da_auction_quarterly_12_uhr", id_auktion_15_uhr"
     "quarter" : "all", # "Q1", "Q2, ...
     # relevant after STRISE sconferece

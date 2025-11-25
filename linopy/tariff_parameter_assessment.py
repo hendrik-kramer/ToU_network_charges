@@ -29,41 +29,28 @@ folder_path = r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\dat
 
 # only ev
 #file_new_contract = r"2025-07-10_11-32_all_spot_scheduled_charging_only_EV_r50_v10" +r"\\"
-file_new_static = r"2025-07-12_07-32_all_mean_smart_charging_only_EV_r100_v50"  + r"\\"
-file_baseline_static = r"2025-07-13_08-51_all_mean_immediate_charging_only_EV_r100_v50" + r"\\"
-file_new_dynamic = r"2025-07-13_01-49_all_spot_smart_charging_only_EV_r100_v50"  + r"\\"
-file_baseline_dynamic = r"2025-07-14_10-23_all_spot_immediate_charging_only_EV_r100_v50" + r"\\"
+file_new_dynamic = r"2025-11-25_04-25_spot_smart_only_EV_r100_v50_sensi_regulatory"  + r"\\"
+file_new_dynamic2 = r"2025-11-25_11-33_spot_smart_only_EV_r100_v50_sensi_double"  + r"\\"
+file_baseline_dynamic = r"2025-11-21_00-39_spot_smart_only_EV_r100_v50_poly" + r"\\"
 
-# prosumage
-file_new_static = r"2025-07-21_22-04_all_mean_smart_charging_prosumage_r30_v20"  + r"\\"
-file_baseline_static = r"2025-07-21_16-28_all_mean_immediate_charging_prosumage_r30_v20" + r"\\"
-file_new_dynamic = r"2025-07-13_01-49_all_spot_smart_charging_only_EV_r100_v50"  + r"\\"
-file_baseline_dynamic = r"2025-07-21_21-28_all_spot_immediate_charging_prosumage_30_v20" + r"\\"
-
-
-
-result_P_BUY_old_static = xr.open_dataarray(folder_path + file_baseline_static + "P_BUY.nc")
-result_P_BUY_new_static = xr.open_dataarray(folder_path + file_new_static + "P_BUY.nc")
-result_P_BUY_old_dynamic = xr.open_dataarray(folder_path + file_baseline_dynamic + "P_BUY.nc")
-result_P_BUY_new_dynamic = xr.open_dataarray(folder_path + file_new_dynamic + "P_BUY.nc")
+result_P_HOME_old_dynamic = xr.open_dataarray(folder_path + file_baseline_dynamic + "P_HOME.nc")
+result_P_HOME_new_dynamic = xr.open_dataarray(folder_path + file_new_dynamic + "P_HOME.nc")
+result_P_HOME_new_dynamic2 = xr.open_dataarray(folder_path + file_new_dynamic2 + "P_HOME.nc")
 
 
 # reconvert seconds to datetime
 epoch_time = datetime(1970, 1, 1)
-dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_P_BUY_old_static["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
-result_P_BUY_old_static["t"] = dti
-result_P_BUY_new_static["t"] = dti
-result_P_BUY_old_dynamic["t"] = dti
-result_P_BUY_new_dynamic["t"] = dti
+dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(result_P_HOME_old_dynamic["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
+result_P_HOME_old_dynamic["t"] = dti
+result_P_HOME_new_dynamic["t"] = dti
+result_P_HOME_new_dynamic2["t"] = dti
 
 
-result_P_BUY_old_static = result_P_BUY_old_static.sel(s="reg")
-result_P_BUY_new_static = result_P_BUY_new_static.sel(s="reg")
-P_delta_neg_static = - np.minimum((result_P_BUY_new_static - result_P_BUY_old_static),0) # decrease of power consumption new < old, but negate to get positive values
+result_P_HOME_old_dynamic = result_P_HOME_old_dynamic.sel(s="red")
+result_P_HOME_new_dynamic = result_P_HOME_new_dynamic.sel(s="red")
+result_P_HOME_new_dynamic2 = result_P_HOME_new_dynamic2.sel(s="red")
 
-result_P_BUY_old_dynamic = result_P_BUY_old_dynamic.sel(s="reg")
-result_P_BUY_new_dynamic = result_P_BUY_new_dynamic.sel(s="reg")
-P_delta_neg_dynamic = - np.minimum((result_P_BUY_new_dynamic - result_P_BUY_old_static),0) # decrease of power consumption new < old, but negate to get positive values
+P_delta_neg_dynamic = - np.minimum((result_P_HOME_new_dynamic - result_P_HOME_old_static),0) # decrease of power consumption new < old, but negate to get positive values
 
 
 

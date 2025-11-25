@@ -118,14 +118,17 @@ def model_emob_quarter_smart2(timesteps, cost_home_xr, network_charges_xr, emob_
     cons_ev_init = m.add_constraints(SOC_EV.isel(t=0) == parameters_model["ev_soc_init_abs"], name='cons_ev_init')
 
 
+
+    cons_balance = m.add_constraints(P_HOME + P_PUBLIC == P_EV, name='cons_balance')
+
+
+
     # EV Charging behavior
     cons_ev_charge_home_max = m.add_constraints(P_HOME <= 1*emob_home_xr * parameters_model["ev_p_charge_home"], name='cons_ev_charge_home_max')
     # always allow public charging to prevent infeasibilities
     #cons_ev_charge_public_max = m.add_constraints(P_PUBLIC <= emob_public_xr * parameters_model["ev_p_charge_not_home"], name='cons_ev_charge_public_max') # optional
     cons_ev_charge_public_max = m.add_constraints(P_PUBLIC <= parameters_model["ev_p_charge_not_home"], name='cons_ev_charge_public_max') # optional
 
-
-    cons_balance = m.add_constraints(P_HOME + P_PUBLIC == P_EV, name='cons_balance')
 
 
     # objective terms
