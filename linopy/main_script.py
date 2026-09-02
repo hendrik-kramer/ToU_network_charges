@@ -28,7 +28,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 length_dso_chunk = 5
 
-charge_strategy = "smart"  # "smart", "scheduled", "immediate"
+charge_strategy = "immediate"  # "smart", "scheduled", "immediate"
 
 
 weight_lookup = {"smart":{"weight_time_preference":0, "weight_only_low_segment":0},
@@ -67,9 +67,7 @@ parameters_opti = {
 
 
 
-
-network_drive = r"\\wiwinf-file01.wiwinf.uni-due.de\home\hendrik.kramer" # r"Z:" 
-
+#folderpath = r"C:\Users\Hendrik.Kramer"
 
 # get relevant timesteps to compute KW1-KW52/53
 timesteps = f_load.load_timesteps(parameters_opti["year"])
@@ -78,12 +76,12 @@ timesteps = f_load.load_timesteps(parameters_opti["year"])
 # ========== LOAD DATA ========== 
 
 # Load spot prices
-parameter_folderpath_prices = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\preise" + "\\"
+parameter_folderpath_prices = r"..\daten_input\preise" + "\\"
 spot_prices_xr = f_load.load_spot_prices(parameters_opti["year"], parameter_folderpath_prices, parameters_opti["auction"], timesteps)  # in ct/kWh
 tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr) 
 
 # Load network charges (regular and reduced)
-parameter_filepath_dsos = network_drive + r"\10_Paper\13_Alleinautorenpaper\Aufgabe_Hendrik_v4.xlsx"
+parameter_filepath_dsos = r"..\daten_input\network_charges\Aufgabe_Hendrik_v4.xlsx"
 network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, sensi_different = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
 
 
@@ -94,8 +92,8 @@ elif parameters_opti["prices"] == "mean":
 
 
 # Load e-Mobility
-parameter_folderpath_emob_demand = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
-parameter_folderpath_emob_state = network_drive + r"\10_Paper\13_Alleinautorenpaper\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
+parameter_folderpath_emob_demand = r"..\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
+parameter_folderpath_emob_state =  r"..\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
 emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0)
@@ -341,9 +339,15 @@ os.makedirs(folder_path, exist_ok=True)
 #result_C_HOME_eur.to_netcdf(folder_path / "C_HOME.nc")
 result_C_ALL.to_netcdf(folder_path / "C_ALL.nc")
 result_C_HOME.to_netcdf(folder_path / "C_HOME.nc")
-result_SOC_EV_1970.to_netcdf(folder_path / "SOC_EV.nc")
-result_P_HOME_1970.to_netcdf(folder_path / "P_HOME.nc")
-result_P_PUBLIC_1970.to_netcdf(folder_path / "P_PUBLIC.nc")
+
+result_SOC_EV_1970_small = result_SOC_EV_1970.astype("int32")
+result_SOC_EV_1970_small.to_netcdf(folder_path / "SOC_EV.nc")
+
+result_P_HOME_1970_small = result_P_HOME_1970.astype("int32")
+result_P_HOME_1970_small.to_netcdf(folder_path / "P_HOME.nc")
+
+result_P_PUBLIC_1970_small = result_P_PUBLIC_1970.astype("int32")
+result_P_PUBLIC_1970_small.to_netcdf(folder_path / "P_PUBLIC.nc")
 
 with open(folder_path / "parameters_opti.txt", 'w') as f:
     f.write(pd.DataFrame.from_dict(parameters_opti, orient='index').to_string(header=False, index=True))
