@@ -264,6 +264,82 @@ def load_network_charges(input_filepath, timesteps, parameters_opti):
     return network_charges_xr.astype(float), xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, different_charges
 
 
+
+
+def redistribute_excess_demand(emob_demand_xr, emob_state_xr, max_val):
+
+    # Work on copies
+    demand = emob_demand_xr.values.copy()
+    state  = emob_state_xr.values.copy()
+
+    # --- Matrix comparison: find all (t, v) where demand > max_val ----------
+    t_indices, v_indices = np.where(demand > max_val)
+    print(f"Found {len(t_indices)} implausible values (> {max_val} kWh)")
+
+    # Sort by t DESCENDING so we never overwrite a not-yet-processed index
+    tv_tuples = sorted(zip(t_indices, v_indices), key=lambda x: x[0], reverse=True)
+    print("Processing from last timestep backwards...")
+
+    # --- Redistribute excess ------------------------------------------------
+    for (t, v) in tv_tuples:
+
+        # Re-check: a previous iteration may have already fixed this cell
+        if demand[t, v] <= max_val:
+            continue
+
+        excess      = demand[t, v] - max_val
+        demand[t, v] = max_val
+
+        next_t = t + 1
+        while excess > 1e-9 and next_t < demand.shape[0]:
+
+            available_capacity = max_val - demand[next_t, v]
+
+            if available_capacity > 0:
+                transfer = min(excess, available_capacity)
+
+                demand[next_t, v] += transfer
+                excess            -= transfer
+
+                # Mark the touched timestep as 'driving'
+                state[next_t, v]   = "driving"
+
+            next_t += 1
+
+        if excess > 1e-9:
+            print(
+                f"  Warning: vehicle v='{v}' at t={t}: could not redistribute "
+                f"remaining excess of {excess:.4f} kWh (end of time series reached)."
+            )
+
+    # --- Wrap results back into xarray DataArrays ---------------------------
+    emob_demand_fixed = xr.DataArray(
+        demand,
+        coords=emob_demand_xr.coords,
+        dims=emob_demand_xr.dims,
+        name=emob_demand_xr.name,
+    )
+    emob_state_fixed = xr.DataArray(
+        state,
+        coords=emob_state_xr.coords,
+        dims=emob_state_xr.dims,
+        name=emob_state_xr.name,
+    )
+
+    # --- Verification -------------------------------------------------------
+   # print(f"\nDemand max kWh before fix — max:    {emob_demand_xr.values.max():.4f}")
+   # print(f"Demand max kWh after fix  — max:    {emob_demand_fixed.values.max():.4f}")
+   # print(f"Demand total kWh before fix — total:  {emob_demand_xr.values.sum():.4f}")
+   # print(f"Demand total kWh after fix  — total:  {emob_demand_fixed.values.sum():.4f}")
+
+    n_state_changes = int((state != emob_state_xr.values).sum())
+    print(f"State cells switched to 'driving': {n_state_changes}")
+
+    return emob_demand_fixed, emob_state_fixed
+
+
+
+
 def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
 
     emob_demand = pd.read_csv(input_filepath_emob_demand, encoding='utf-8')
@@ -302,6 +378,8 @@ def load_emob(input_filepath_emob_demand, input_filepath_emob_state, timesteps):
     time_offset = pd.to_datetime(emob_year.index) - datetime.timedelta(hours=1)
     emob_year.index = time_offset.tz_localize("utc").tz_convert("Europe/Berlin")
     emob_state_xr = xr.DataArray(emob_year, dims=['t','v'])
+    
+    #emob_demand_fixed, emob_state_fixed = redistribute_excess_demand(emob_demand_xr, emob_state_xr, max_val=7.0)
     
     return emob_demand_xr, emob_state_xr
 

@@ -28,7 +28,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 length_dso_chunk = 5
 
-charge_strategy = "immediate"  # "smart", "scheduled", "immediate"
+charge_strategy = "smart"  # "smart", "scheduled", "immediate"
 
 
 weight_lookup = {"smart":{"weight_time_preference":0, "weight_only_low_segment":0},
@@ -39,18 +39,18 @@ parameters_model = {
     "ev_p_charge_home":11, # kW
     "ev_soc_max": 70, # kWh
     "ev_soc_init_rel": 1, # %
-    "ev_soc_preference": 0.9, # %
+    "ev_soc_preference": 0.9, # %2
     "ev_soc_departure": 0.9, # %
-    "ev_p_charge_not_home": 22, # kW
+    "ev_p_charge_not_home": 100, # kW
     "ev_eta_in": 0.95,
     "ev_losses": 0.01, # 10 W for standby
-    "cost_public_charge_pole": 43.7 # ct/kW
+    "cost_public_charge_pole": 41.67 # ct/kW
     }
 
 parameters_opti = {
-    "prices": "spot", # "spot", "mean"
+    "prices": "mean", # "spot", "mean"
     "year":2024,
-    "dso_subset" : range(0,100), # excel read in only consideres 100 rows!
+    "dso_subset" : range(0,100), #range(0,100), # excel read in only consideres 100 rows!
     "emob_subset" : range(0,50),
     "settings_setup": "only_EV", # "only_EV", # "prosumage"
     "network_charges_sensisitity_study": False, # change settings  in the load function possible (works only for smart and spot)
@@ -96,6 +96,7 @@ parameter_folderpath_emob_demand = r"..\daten_input\e_mobility_emoby\ev_consumpt
 parameter_folderpath_emob_state =  r"..\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
+
 emob_arrival_times, emob_departure_times, dict_idx_lookup = f_load.deduce_arrival_departure_times(emob_demand_xr, emob_state_xr, timesteps, 0)
 
 
@@ -129,7 +130,7 @@ emob_subset = parameters_opti["emob_subset"]
 timesteps = timesteps.loc[time_subset]
 spot_prices_xr = spot_prices_xr.isel(t=time_subset).fillna(10)
 network_charges_xr = network_charges_xr.isel(t=time_subset, r=dso_subset)
-emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset)
+emob_demand_xr = emob_demand_xr.isel(t=time_subset, v=emob_subset) 
 emob_state_xr = emob_state_xr.isel(t=time_subset, v=emob_subset)
 emob_departure_times = emob_departure_times.iloc[emob_subset]
 
@@ -335,10 +336,8 @@ str_now = datetime.now().strftime("%Y-%m-%d_%H-%M")
 folder_path = Path("../daten_results/" + str_now + "_" + parameters_opti["prices"] + "_" + charge_strategy + "_" + parameters_opti["settings_setup"])
 os.makedirs(folder_path, exist_ok=True)
 
-#result_C_ALL_eur.to_netcdf(folder_path / "C_ALL.nc")
-#result_C_HOME_eur.to_netcdf(folder_path / "C_HOME.nc")
-result_C_ALL.to_netcdf(folder_path / "C_ALL.nc")
-result_C_HOME.to_netcdf(folder_path / "C_HOME.nc")
+result_C_ALL_eur.to_netcdf(folder_path / "C_ALL.nc")
+result_C_HOME_eur.to_netcdf(folder_path / "C_HOME.nc")
 
 result_SOC_EV_1970_small = result_SOC_EV_1970.astype("int32")
 result_SOC_EV_1970_small.to_netcdf(folder_path / "SOC_EV.nc")

@@ -99,9 +99,9 @@ def model_emob_quarter_smart2(timesteps, cost_home_xr, network_charges_xr, emob_
     # =========== CONSTRAINTS ===============
 
 
-    # EV Battery behavior
+    # EV Battery behavior (p_charging*tau, e_demand w/o tau, p_losses*tau)
     cons_ev_update = m.add_constraints(SOC_EV.isel(t=range(1,len(set_time))) == SOC_EV.isel(t=range(0,len(set_time)-1)) 
-                                                                       + timesteplength * (parameters_model["ev_eta_in"] * P_EV.isel(t=range(0,len(set_time)-1)) - 1/parameters_model["ev_eta_in"]*emob_demand_xr.isel(t=range(0,len(set_time)-1)) - parameters_model["ev_losses"] ) , name='cons_ev_update')
+                                                                       + timesteplength * parameters_model["ev_eta_in"] * P_EV.isel(t=range(0,len(set_time)-1)) - 1/parameters_model["ev_eta_in"]*emob_demand_xr.isel(t=range(0,len(set_time)-1)) - timesteplength*parameters_model["ev_losses"]  , name='cons_ev_update')
     
     cons_ev_max_soc = m.add_constraints(SOC_EV <= parameters_model["ev_soc_max"], name='cons_ev_max_soc')
     

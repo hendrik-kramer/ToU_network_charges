@@ -113,19 +113,19 @@ if (False):
     axis_y_max = 200
     result_shape = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="reg").shape
     dso_x_ev = result_shape[0] * result_shape[1]
-    immediate_spot_standard = xr.open_dataarray(immediate_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) / 100 
-    immediate_spot_ToU = xr.open_dataarray(immediate_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) / 100
-    scheduled_spot_standard = xr.open_dataarray(scheduled_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) / 100
-    scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) /100
-    smart_spot_standard = xr.open_dataarray(smart_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)  / 100
-    smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)  / 100
+    immediate_spot_standard = xr.open_dataarray(immediate_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) 
+    immediate_spot_ToU = xr.open_dataarray(immediate_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) 
+    scheduled_spot_standard = xr.open_dataarray(scheduled_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) 
+    scheduled_spot_ToU = xr.open_dataarray(scheduled_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) 
+    smart_spot_standard = xr.open_dataarray(smart_spot_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)  
+    smart_spot_ToU = xr.open_dataarray(smart_spot_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)  
 
-    immediate_mean_standard = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) / 100
-    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) / 100
-    scheduled_mean_standard = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) / 100
-    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) / 100
-    smart_mean_standard = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) / 100
-    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) / 100
+    immediate_mean_standard = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) 
+    immediate_mean_ToU = xr.open_dataarray(immediate_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) 
+    scheduled_mean_standard = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev) 
+    scheduled_mean_ToU = xr.open_dataarray(scheduled_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev) 
+    smart_mean_standard = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="reg").to_numpy().reshape(dso_x_ev)
+    smart_mean_ToU = xr.open_dataarray(smart_mean_only_charge + cost_type_file).sel(s="red").to_numpy().reshape(dso_x_ev)
 
     pd_standard_static = pd.DataFrame({'immediate':immediate_mean_standard, 'scheduled':scheduled_mean_standard, 'smart':smart_mean_standard})
     pd_standard_dynamic = pd.DataFrame({'immediate': immediate_spot_standard, 'scheduled':scheduled_spot_standard, 'smart':smart_spot_standard})
