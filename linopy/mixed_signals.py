@@ -28,6 +28,8 @@ import os
 import warnings
 import re
 
+from scipy.stats import pearsonr
+
 import functions_tariff_network_charge_study.load_functions as f_load
 
 
@@ -252,6 +254,8 @@ all_prices_minus_mean_15min_iso_2024 = all_prices_minus_mean_15min[idx_iso_2024
                                                                    | (all_prices_minus_mean_15min.index==pd.to_datetime("2024-12-31 23:30:00"))
                                                                    | (all_prices_minus_mean_15min.index==pd.to_datetime("2024-12-31 23:45:00"))]
 
+all_prices_minus_mean_15min_iso_2024.index = all_prices_minus_mean_15min_iso_2024.index.tz_localize('Europe/Berlin')
+
 
 
 # ===== LOAD NETWORK CHARGES ====  
@@ -264,7 +268,7 @@ for ct_year in [2018, 2019, 2020, 2021, 2022, 2023, 2024]:
     timesteps_all = pd.concat([timesteps_all, timesteps_ct], axis=0)
 timesteps_all_years = timesteps_all.drop_duplicates()
 
-network_charges_xr_all_years, _ , _ , _ , _ , _ , _ , _   = f_load.load_network_charges(filename_dsos, timesteps_all_years, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr_all_years, _ , _ , _ , _ , _ , _ , _   = f_load.load_network_charges(filename_dsos, timesteps_all_years, False) # dimension: Time x DSO region x scenario (red, reg)
 network_charges_pandas_all_years = network_charges_xr_all_years.sel(s="red").drop("s").to_pandas()
 network_charges_pandas_all_years_unique = network_charges_pandas_all_years[~network_charges_pandas_all_years.index.duplicated(keep='first')]
 network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_years_unique[network_charges_pandas_all_years_unique.index.year<=2024]
@@ -272,12 +276,41 @@ network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_yea
 network_charges_signal = network_charges_pandas_all_years_unique_no_2025 - network_charges_pandas_all_years_unique_no_2025.median()
 network_charges_signal_iso_2024 = network_charges_signal[network_charges_signal.index.isocalendar().year==2024]
 
-# === export subset of critical prices
+# === export subset of critical prices ==============
 critical_steps = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
 for ct_col in critical_steps.columns:
     critical_steps.loc[:,ct_col] = (1*(network_charges_signal_iso_2024[ct_col] > 0).to_numpy() & 1*(all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) ) #&
                                  #  1*(np.absolute(all_prices_minus_mean_15min_iso_2024.to_numpy().T) > np.absolute(network_charges_signal_iso_2024[ct_col].to_numpy( ) ) ) )
-critical_steps.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso2024.csv")
+critical_steps.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso2024_red.csv")
+
+
+critical_steps_blue = critical_steps.copy()
+for ct_col in critical_steps_blue.columns:
+    critical_steps_blue.loc[:, ct_col] = (
+        1 * (network_charges_signal_iso_2024[ct_col] < 0).to_numpy() &  # network charge signal negative
+        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) &   # market signal negative
+        1 * (  np.absolute(all_prices_minus_mean_15min_iso_2024.to_numpy().T) >
+               np.absolute(network_charges_signal_iso_2024[ct_col].to_numpy()) ) )     # |market| > |network|
+critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso2024_blue.csv")
+
+# === non-critical masks ===
+# red: y > 0 (market above median) and -1 < x < 1 (network charge signal bounded)
+no_critical_steps_red = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
+for ct_col in no_critical_steps_red.columns:
+    no_critical_steps_red.loc[:, ct_col] = (
+        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T > 0) &           # y > 0: market above median
+        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() > -1) &         # x > -1
+        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() < 1) )          # x < +1
+no_critical_steps_red.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_iso2024_red.csv")
+
+# blue: y < 0 (market below median) and -1 < x < 1 (network charge signal bounded)
+no_critical_steps_blue = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
+for ct_col in no_critical_steps_blue.columns:
+    no_critical_steps_blue.loc[:, ct_col] = (
+        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) &           # y < 0: market below median
+        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() > -1) &         # x > -1
+        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() < 1) )          # x < +1
+no_critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_iso2024_blue.csv")
 
 
 # ===== HEATMAP PLOT, Exemplary for 2024 ===== 
@@ -296,11 +329,11 @@ for ct_dsos in network_charges_signal.columns:
     x_vals.extend(list( all_prices_minus_mean_15min["spot_signal_ct_kWh"][:]))
 
 pd_all_data = pd.DataFrame({'xvals':x_vals, 'yvals': y_vals}).dropna(subset = ['xvals', 'yvals'])
-
+pd_all_data = pd_all_data[pd_all_data.yvals != 0]
 
 # ===== only 2024 =====
 this_year = 2024
-all_years = True
+all_years = False
 
 def get_shares(this_year, network_charges_signal, all_prices_minus_mean_15min):
     
@@ -387,7 +420,7 @@ ax_ssc.tick_params(axis='y', labelsize=my_fontsize)
 
 # add colorbar
 cbar = fig_signal_scatter.colorbar(hist_signal, orientation="vertical")
-cbar.set_label("Data pairs per bin", fontsize=my_fontsize)
+cbar.set_label("Data Pairs per Bin", fontsize=my_fontsize)
 ticklabs = cbar.ax.get_yticklabels()
 cbar.ax.set_yticklabels(ticklabs, fontsize=my_fontsize) 
 cbar.ax.yaxis.set_ticks([0, 50e3, 100e3, 150e3, 200e3, 250e3])
@@ -400,14 +433,14 @@ ax_ssc.vlines(x=[0], ymin=-yy, ymax=yy, colors=['gray'], linestyles=['--'], line
 ax_ssc.axline([-yy, -yy], [yy, yy], color="gray", linestyle="--", linewidth=2)
 ax_ssc.axline([yy, -yy], [-yy, yy], color="gray", linestyle="--", linewidth=2)
 
-ax_ssc.text(-12.5, 7.5, r'$\text{II}_{market}$' + "\n" + str(q2_market) + " %", fontsize=16, ha='center', va='center')
-ax_ssc.text(-7.5, 12.5, r'$\text{II}_{network}$' + "\n" + str(q2_network) + " %", fontsize=16, ha='center', va='center')
-ax_ssc.text(7.5, 12.5, r'$\text{I}_{network}$' + "\n" + str(q1_network) + " %", fontsize=16, ha='center', va='center')
-ax_ssc.text(12.5, 7.5, r'$\text{I}_{market}$' + "\n" + str(q1_market) + " %",fontsize=16, ha='center', va='center')
-ax_ssc.text(-17.5, -7.5, r'$\text{III}_{market}$' + "\n" + str(q3_market) + " %",fontsize=16, ha='center', va='center')
-ax_ssc.text(-7.5, -12.5, r'$\text{III}_{network}$' + "\n" + str(q3_network) + " %", fontsize=16, ha='center', va='center')
-ax_ssc.text(12.5, -7.5, r'$\text{IV}_{market}$' + "\n" + str(q4_market) + " %", fontsize=16, ha='center', va='center')
-ax_ssc.text(7.5, -12.5, r'$\text{IV}_{network}$' + "\n" + str(q4_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(-12.5, 7.5, r'$\text{II}_{Market}$' + "\n" + str(q2_market) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(-7.5, 12.5, r'$\text{II}_{Network}$' + "\n" + str(q2_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(7.5, 12.5, r'$\text{I}_{Network}$' + "\n" + str(q1_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(12.5, 7.5, r'$\text{I}_{Market}$' + "\n" + str(q1_market) + " %",fontsize=16, ha='center', va='center')
+ax_ssc.text(-17.5, -7.5, r'$\text{III}_{Market}$' + "\n" + str(q3_market) + " %",fontsize=16, ha='center', va='center')
+ax_ssc.text(-7.5, -12.5, r'$\text{III}_{Network}$' + "\n" + str(q3_network) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(12.5, -7.5, r'$\text{IV}_{Market}$' + "\n" + str(q4_market) + " %", fontsize=16, ha='center', va='center')
+ax_ssc.text(7.5, -12.5, r'$\text{IV}_{Network}$' + "\n" + str(q4_network) + " %", fontsize=16, ha='center', va='center')
 
 
 # Change major ticks to show every 20.
@@ -416,16 +449,15 @@ ax_ssc.yaxis.set_major_locator(MultipleLocator(5))
 
 ax_ssc.grid(True, color="gray", linestyle="--", linewidth=1, zorder=0)
 
-ax_ssc.set_xlabel("Market signal in ct/kWh \n \xa0 \n lower  ←|→ higher \n than the mean electricity price of the daily planning period", fontsize=my_fontsize)
-ax_ssc.set_ylabel("Low – Standard  ←|→ High – Standard \n \xa0 \n   Network signal in ct/kWh",  fontsize=my_fontsize)
+ax_ssc.set_xlabel("Market Signal in ct/kWh \n \xa0 \n Lower  ←|→ Higher \n than the Mean Electricity Price of the Daily Planning Period", fontsize=my_fontsize)
+ax_ssc.set_ylabel("Low – Standard  ←|→ High – Standard \n \xa0 \n   Network Signal in ct/kWh",  fontsize=my_fontsize)
 
 ax_ssc.set_xlim(xmin=-xx, xmax=xx)
 ax_ssc.set_ylim(-yy,yy)
 
-from scipy.stats import pearsonr
-corr_coef, _ = pearsonr(pd_all_data.xvals, pd_all_data.yvals)
+#corr_coef, _ = pearsonr(pd_all_data.xvals, pd_all_data.yvals)
 
-fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\pos_neg_da_signals.svg", format="svg")
+fig_signal_scatter.savefig(r"C:\Users\Hendrik.Kramer\Documents\Repos\ToU_network_charges\daten_results\pos_neg_da_signals.svg", format="svg")
 
 
 
@@ -502,10 +534,16 @@ for idx, key in enumerate(left_keys):
         perc = int(round(arr[idx, j] * 100))
         ax.text(cx, cy, f"{perc}%", fontsize=16, ha='center', va='center', color='black')
 
-    # red line
+    # darkred dashed lines
     extra_tri = np.array([[-0.2, 0.1], [-0.9, 0.8], [-0.9, 0.1]])
-    poly_extra = Polygon(extra_tri, closed=True, facecolor='none', edgecolor='darkred', linestyle='--', linewidth=1)
+    poly_extra = Polygon(extra_tri, closed=True, facecolor='none', edgecolor='#8b3003', linestyle='--', linewidth=1)
     ax.add_patch(poly_extra)
+    
+    # blue dashed lines
+    extra_tri_blue = extra_tri * np.array([1, -1]) # um x-Achse vom roten Dreick gespiegeld
+    poly_extra_blue = Polygon(extra_tri_blue, closed=True, facecolor='none', edgecolor='#004c93', linestyle='--', linewidth=1)
+    ax.add_patch(poly_extra_blue)
+    
 
 
 # Rechte Spalte (colorbar) bleibt leer
@@ -530,4 +568,4 @@ cbar.set_label('Data pairs (relative)', fontsize=my_fontsize)
 
 plt.show()
 
-fig_seperate_years.savefig(r"C:\Users\Hendrik.Kramer\Documents\GitHub\ToU_network_charges\daten_results\signals_six_years.svg", format="svg")
+fig_seperate_years.savefig(r"Z:\10_Paper\13_Alleinautorenpaper\grafiken\signals_six_years_2026.svg", format="svg")

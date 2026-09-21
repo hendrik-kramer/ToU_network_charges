@@ -28,7 +28,7 @@ warnings.simplefilter(action='ignore', category=UserWarning)
 
 length_dso_chunk = 5
 
-charge_strategy = "smart"  # "smart", "scheduled", "immediate"
+charge_strategy = "immediate"  # "smart", "scheduled", "immediate"
 
 
 weight_lookup = {"smart":{"weight_time_preference":0, "weight_only_low_segment":0},
@@ -82,7 +82,7 @@ tariff_static_price = f_load.get_annual_static_tariff_prices(spot_prices_xr)
 
 # Load network charges (regular and reduced)
 parameter_filepath_dsos = r"..\daten_input\network_charges\Aufgabe_Hendrik_v4.xlsx"
-network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, sensi_different = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti) # dimension: Time x DSO region x scenario (red, reg)
+network_charges_xr, xr_dso_quarters_sum, xr_ht_length, xr_nt_length, xr_ht_charge, xr_st_charge, xr_nt_charge, sensi_different = f_load.load_network_charges(parameter_filepath_dsos, timesteps, parameters_opti["network_charges_sensisitity_study"]) # dimension: Time x DSO region x scenario (red, reg)
 
 
 if parameters_opti["prices"] == "spot":
@@ -92,8 +92,8 @@ elif parameters_opti["prices"] == "mean":
 
 
 # Load e-Mobility
-parameter_folderpath_emob_demand = r"..\daten_input\e_mobility_emoby\ev_consumption_2025_07_08.csv"
-parameter_folderpath_emob_state =  r"..\daten_input\e_mobility_emoby\ev_state_2025_07_08.csv"
+parameter_folderpath_emob_demand = r"..\daten_input\e_mobility_emoby\ev_consumption_2026_09_15__23_47.csv"
+parameter_folderpath_emob_state =  r"..\daten_input\e_mobility_emoby\ev_state_2026_09_15__23_47.csv"
 emob_demand_xr, emob_state_xr = f_load.load_emob(parameter_folderpath_emob_demand, parameter_folderpath_emob_state, timesteps)
 
 

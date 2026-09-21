@@ -158,7 +158,7 @@ def get_annual_static_tariff_prices(spot_prices_xr):
     
 
 
-def load_network_charges(input_filepath, timesteps, parameters_opti):
+def load_network_charges(input_filepath, timesteps, parameters_opti_sensitivity):
 
     network_charges_hours = pd.read_excel(input_filepath, sheet_name=0).head(100)
     network_charges_euro = pd.read_excel(input_filepath, sheet_name=1).head(100)
@@ -190,7 +190,7 @@ def load_network_charges(input_filepath, timesteps, parameters_opti):
     charges_HSN = charges_HSN.drop(charges_HSN.index[0])
     charges_HSN.index = charges_HSN.index.str.replace("AP_","").str.replace("T_ct/kWh","")
     
-    if parameters_opti["network_charges_sensisitity_study"]: # overwrite with altere NT and HT charges
+    if parameters_opti_sensitivity: # overwrite with altere NT and HT charges
         print("Modify network charges to match 10% NT")
         new_charges = pd.read_csv(r"Z:\10_Paper\13_Alleinautorenpaper\VNB\new_network_charges_sensitivity.csv", index_col="r").rename(columns={"HT":"H","NT":"N"}).transpose()
         
