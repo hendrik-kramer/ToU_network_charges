@@ -274,43 +274,40 @@ network_charges_pandas_all_years_unique = network_charges_pandas_all_years[~netw
 network_charges_pandas_all_years_unique_no_2025 = network_charges_pandas_all_years_unique[network_charges_pandas_all_years_unique.index.year<=2024]
 
 network_charges_signal = network_charges_pandas_all_years_unique_no_2025 - network_charges_pandas_all_years_unique_no_2025.median()
-network_charges_signal_iso_2024 = network_charges_signal[network_charges_signal.index.isocalendar().year==2024]
 
-# === export subset of critical prices ==============
-critical_steps = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
+# === export subset of critical prices (all years) ==============
+critical_steps = pd.DataFrame(columns=network_charges_signal.columns, index=network_charges_signal.index)
 for ct_col in critical_steps.columns:
-    critical_steps.loc[:,ct_col] = (1*(network_charges_signal_iso_2024[ct_col] > 0).to_numpy() & 1*(all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) ) #&
-                                 #  1*(np.absolute(all_prices_minus_mean_15min_iso_2024.to_numpy().T) > np.absolute(network_charges_signal_iso_2024[ct_col].to_numpy( ) ) ) )
-critical_steps.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso2024_red.csv")
+    critical_steps.loc[:,ct_col] = (1*(network_charges_signal[ct_col] > 0).to_numpy() & 1*(all_prices_minus_mean_15min.to_numpy().T < 0) )
+critical_steps.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_red.csv")
 
-
-critical_steps_blue = critical_steps.copy()
+critical_steps_blue = pd.DataFrame(columns=network_charges_signal.columns, index=network_charges_signal.index)
 for ct_col in critical_steps_blue.columns:
     critical_steps_blue.loc[:, ct_col] = (
-        1 * (network_charges_signal_iso_2024[ct_col] < 0).to_numpy() &  # network charge signal negative
-        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) &   # market signal negative
-        1 * (  np.absolute(all_prices_minus_mean_15min_iso_2024.to_numpy().T) >
-               np.absolute(network_charges_signal_iso_2024[ct_col].to_numpy()) ) )     # |market| > |network|
-critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_iso2024_blue.csv")
+        1 * (network_charges_signal[ct_col] < 0).to_numpy() &                          # network charge signal negative
+        1 * (all_prices_minus_mean_15min.to_numpy().T < 0) &                           # market signal negative
+        1 * (  np.absolute(all_prices_minus_mean_15min.to_numpy().T) >
+               np.absolute(network_charges_signal[ct_col].to_numpy()) ) )               # |market| > |network|
+critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\critical_timesteps_blue.csv")
 
-# === non-critical masks ===
-# red: y > 0 (market above median) and -1 < x < 1 (network charge signal bounded)
-no_critical_steps_red = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
+# === non-critical masks (all years) ===
+# red: -1 < y < 1 (market bounded), x > 0 (network charge positive)
+no_critical_steps_red = pd.DataFrame(columns=network_charges_signal.columns, index=network_charges_signal.index)
 for ct_col in no_critical_steps_red.columns:
     no_critical_steps_red.loc[:, ct_col] = (
-        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T > 0) &           # y > 0: market above median
-        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() > -1) &         # x > -1
-        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() < 1) )          # x < +1
-no_critical_steps_red.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_iso2024_red.csv")
+        1 * (all_prices_minus_mean_15min.to_numpy().T > -1) &                           # y > -1: market bounded below
+        1 * (all_prices_minus_mean_15min.to_numpy().T <  1) &                           # y <  1: market bounded above
+        1 * (network_charges_signal[ct_col].to_numpy() > 0) )                           # x >  0: network charge positive
+no_critical_steps_red.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_red.csv")
 
-# blue: y < 0 (market below median) and -1 < x < 1 (network charge signal bounded)
-no_critical_steps_blue = pd.DataFrame(columns=network_charges_signal_iso_2024.columns, index=network_charges_signal_iso_2024.index)
+# blue: -1 < y < 1 (market bounded), x < 0 (network charge negative)
+no_critical_steps_blue = pd.DataFrame(columns=network_charges_signal.columns, index=network_charges_signal.index)
 for ct_col in no_critical_steps_blue.columns:
     no_critical_steps_blue.loc[:, ct_col] = (
-        1 * (all_prices_minus_mean_15min_iso_2024.to_numpy().T < 0) &           # y < 0: market below median
-        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() > -1) &         # x > -1
-        1 * (network_charges_signal_iso_2024[ct_col].to_numpy() < 1) )          # x < +1
-no_critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_iso2024_blue.csv")
+        1 * (all_prices_minus_mean_15min.to_numpy().T > -1) &                           # y > -1: market bounded below
+        1 * (all_prices_minus_mean_15min.to_numpy().T <  1) &                           # y <  1: market bounded above
+        1 * (network_charges_signal[ct_col].to_numpy() < 0) )                           # x <  0: network charge negative
+no_critical_steps_blue.to_csv(r"Z:\10_Paper\13_Alleinautorenpaper\no_critical_timesteps_blue.csv")
 
 
 # ===== HEATMAP PLOT, Exemplary for 2024 ===== 

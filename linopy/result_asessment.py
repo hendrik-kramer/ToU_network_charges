@@ -433,6 +433,23 @@ if (False):
 # Plots Simultane Nutzung, Quantile Plot
 # ===================================
 
+# Load scheduled charging data for upper left panel
+scheduled_spot_da = xr.open_dataarray(folder_str + scheduled_spot_only_charge_str + variable_file)
+scheduled_mean_da = xr.open_dataarray(folder_str + scheduled_mean_only_charge_str + variable_file)
+
+scheduled_charges = xr.concat(
+    [scheduled_mean_da.expand_dims(price=["mean"]),
+     scheduled_spot_da.expand_dims(price=["spot"])],
+    dim="price",
+)
+
+scheduled_charges2 = scheduled_charges.sum("v") / (50 * 11)
+scheduled_charges2 = scheduled_charges2.assign_coords(t=("t", multi_index))
+scheduled_charges3 = scheduled_charges2.drop_duplicates("t").unstack("t")
+scheduled_charges4 = scheduled_charges3.isel(r=1)
+scheduled_quant = scheduled_charges4.quantile(q=quantile_values, dim="d")
+
+
 class HandlerTopLinePatch(HandlerPatch):
     """Legend handler: filled rect with only a black line on top."""
 
@@ -503,10 +520,10 @@ def plot_quantile_panel(ax, da_panel, facecolor_hex, n_days=N_DAYS):
     ax.set_xticks(ticks)
     ax.set_xticklabels([str(t) for t in ticks], fontsize=20)
 
-    ticks = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 1])
+    ticks = np.array([0, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6])
     ax.set_yticks(ticks)
-    ax.set_yticklabels(["0.0", "", "0.2", "", "0.4", "", "0.6", "", "0.8", "", "1.0"], fontsize=20)
-    ax.set_ylim(0, 1)
+    ax.set_yticklabels(["0%", "", "20%", "", "40%", "", "60%"], fontsize=20)
+    ax.set_ylim(0, 0.6)
 
     # Grid
     ax.grid(color='lightgray', linestyle='--', linewidth=1, axis='both')
@@ -562,7 +579,7 @@ def plot_quantile_panel(ax, da_panel, facecolor_hex, n_days=N_DAYS):
         title_fontsize=16
     )
     ax.set_xlabel("Hour of the Day", fontsize=20)
-    ax.set_ylabel("Energy (relative)", fontsize=20)
+    #ax.set_ylabel("Simultaneity", fontsize=20)
 
 
 
@@ -578,14 +595,36 @@ panel_colors = {
 }
 
 # Panels zeichnen
-plot_quantile_panel(axs[0, 0], quant.sel(price="mean", s="reg"), panel_colors[(0, 0)])
+plot_quantile_panel(axs[0, 0], scheduled_quant.sel(price="mean", s="reg")/2, panel_colors[(0, 0)])
 axs[0, 0].legend_.set_bbox_to_anchor((0.62, 1))
-plot_quantile_panel(axs[0, 1], quant.sel(price="spot", s="reg"), panel_colors[(0, 1)])
+plot_quantile_panel(axs[0, 1], quant.sel(price="spot", s="reg")/2, panel_colors[(0, 1)])
 axs[0, 1].legend_.set_bbox_to_anchor((0.62, 1))
-plot_quantile_panel(axs[1, 0], quant.sel(price="mean", s="red"), panel_colors[(1, 0)])
+plot_quantile_panel(axs[1, 0], quant.sel(price="mean", s="red")/2, panel_colors[(1, 0)])
 axs[1, 0].legend_.set_bbox_to_anchor((0.62, 1))
-plot_quantile_panel(axs[1, 1], quant.sel(price="spot", s="red"), panel_colors[(1, 1)])
+plot_quantile_panel(axs[1, 1], quant.sel(price="spot", s="red")/2, panel_colors[(1, 1)])
 axs[1, 1].legend_.set_bbox_to_anchor((0.62, 1))
+
+
+
+charging_annotations = {
+    (0, 0): {"label": "Scheduled", "xy": (0.03, 0.93)},
+    (0, 1): {"label": "Smart",     "xy": (0.75, 0.35)},
+    (1, 0): {"label": "Smart",     "xy": (0.03, 0.93)},
+    (1, 1): {"label": "Smart",     "xy": (0.75, 0.35)},
+}
+
+for (row, col), props in charging_annotations.items():
+    axs[row, col].annotate(
+        props["label"],
+        xy=props["xy"],
+        xycoords='axes fraction',
+        fontsize=16,
+        fontweight='bold',
+        ha='left',
+        va='top',
+        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='lightgray', alpha=0.8)
+    )
+
 
 fig_parallel.text(0.04, 0.76, "Standard", fontsize=20, fontweight='bold', rotation=90, va='center')
 fig_parallel.text(0.04, 0.33, "Time of Use", fontsize=20, fontweight='bold', rotation=90, va='center')
@@ -708,70 +747,166 @@ charges_critical_blue     = charges_critical_365.where(mask_critical_blue)
 charges_no_critical_blue  = charges_critical_365.where(mask_no_critical_blue)
 
 # === Compute max per quarter hour over all days, per (y, r) ===
-max_critical_red     = charges_critical_red.max(dim='d',     skipna=True)
-max_no_critical_red  = charges_no_critical_red.max(dim='d',  skipna=True)
-max_critical_blue    = charges_critical_blue.max(dim='d',    skipna=True)
-max_no_critical_blue = charges_no_critical_blue.max(dim='d', skipna=True)
+max_critical_red_qh     = charges_critical_red.max(dim='d',     skipna=True)   # (y, r, qh)
+max_no_critical_red_qh  = charges_no_critical_red.max(dim='d',  skipna=True)   # (y, r, qh)
+max_critical_blue_qh    = charges_critical_blue.max(dim='d',    skipna=True)   # (y, r, qh)
+max_no_critical_blue_qh = charges_no_critical_blue.max(dim='d', skipna=True)   # (y, r, qh)
 
-# === Compute deltas ===
-diff_red  = max_critical_red  - max_no_critical_red
-diff_blue = max_no_critical_blue - max_critical_blue
+# === Deltas: peak critical - peak non-critical ===
+diff_red  = max_critical_red_qh  - max_no_critical_red_qh    # (y, r, qh)
+diff_blue = max_no_critical_blue_qh - max_critical_blue_qh   # (y, r, qh)  # note sign convention kept
+
+# === Stack over (y, r) — distribution is across DSOs × years per qh ===
+# → quantile plot: spread = variation across DSO regions (and years)
 
 
-# ── Plot ──────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(15, 6))
+# === Replace negative values with zero ===
+diff_red_clipped  = diff_red.clip(min=0)
+diff_blue_clipped = diff_blue.clip(min=0)
 
-ax1 = axes[0]
-ax2 = axes[1]
+# === Stack over (y, r) ===
+diff_red_stacked  = diff_red_clipped.stack(yr=('y', 'r'))  * plug_in_rate
+diff_blue_stacked = diff_blue_clipped.stack(yr=('y', 'r')) * plug_in_rate
+
+quantiles = [0.5, 0.75, 0.90, 0.95]
+
+q_red     = diff_red_stacked.quantile(quantiles,  dim='yr')
+mean_red  = diff_red_stacked.mean(dim='yr')
+max_red   = diff_red_stacked.max(dim='yr')
+
+q_blue    = diff_blue_stacked.quantile(quantiles, dim='yr')
+mean_blue = diff_blue_stacked.mean(dim='yr')
+max_blue  = diff_blue_stacked.max(dim='yr')
+
+
+# Plot
+fig_critical_simultanety, axes = plt.subplots(1, 2, figsize=(15, 6))
+ax1, ax2 = axes
+
+qh_vals_red  = q_red.qh.values
+qh_vals_blue = q_blue.qh.values
+
+# Define colors and alpha levels for quantile lines (darker for higher quantiles)
+red_colors = ['#8b3003', '#8b3003', '#8b3003', '#8b3003']
+red_alphas = [0.2, 0.4, 0.6, 0.8]  # Increasing alpha for higher quantiles
+
+blue_colors = ['#004c93', '#004c93', '#004c93', '#004c93']
+blue_alphas = [0.2, 0.4, 0.6, 0.8]  # Increasing alpha for higher quantiles
 
 # ── Left subfigure (red) ──────────────────────────────────────────────────────
-for r in diff_red.r.values:
-    for yr in diff_red.y.values:
-        ax1.plot(
-            diff_red.qh.values,
-            diff_red.sel(r=r, y=yr).values,
-            alpha=0.05,
-            color='#8b3003'
-        )
-ax1.axhline(0, color='darkgray', linewidth=2, linestyle='--')
 ax1.grid(True, linestyle='--', color='lightgray', zorder=0)
+
+# Single fill_between from 0 to max with alpha=0.1
+ax1.fill_between(qh_vals_red,
+                 0,
+                 max_red.values,
+                 color='#8b3003', alpha=0.1, zorder=1)
+
+# Draw quantile lines with increasing darkness (all 1px)
+ax1.plot(qh_vals_red, q_red.sel(quantile=0.50).values,
+         color=red_colors[0], linewidth=1, alpha=red_alphas[0], 
+         zorder=6, label='25% of DSOs exceeding')
+
+ax1.plot(qh_vals_red, q_red.sel(quantile=0.75).values,
+         color=red_colors[1], linewidth=1, alpha=red_alphas[1], 
+         zorder=7, label='10% of DSOs exceeding')
+
+ax1.plot(qh_vals_red, q_red.sel(quantile=0.90).values,
+         color=red_colors[2], linewidth=1, alpha=red_alphas[2], 
+         zorder=8, label='5% of DSOs exceeding')
+
+ax1.plot(qh_vals_red, q_red.sel(quantile=0.95).values,
+         color=red_colors[3], linewidth=1, alpha=red_alphas[3], 
+         zorder=9, label='Maximum')
+
+# Draw max line (black solid, 1px)
+ax1.plot(qh_vals_red, max_red.values,
+         color='black', linewidth=1, alpha=1.0, linestyle='-',
+         zorder=10)
+
 ax1.set_xlim(0, 24)
 ax1.set_xticks([0, 3, 6, 9, 12, 15, 18, 21, 24])
-ax1.set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20, zorder=0)
-ax1.set_ylim(-0.25, 0.25)
-yticks1 = [round(v * 0.05, 2) for v in range(-5, 6)]
+ax1.set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
+ax1.set_ylim(0, 0.25)
+yticks1 = [round(v * 0.025, 3) for v in range(0, 11)]
+yticklabels1 = [f"{int(round(v*100))}%" if i % 2 == 0 else "" for i, v in enumerate(yticks1)]
 ax1.set_yticks(yticks1)
-ax1.set_yticklabels([str(v) for v in yticks1], fontsize=20)
+ax1.set_yticklabels(yticklabels1, fontsize=16)
 ax1.set_xlabel('Hour of the Day', fontsize=20)
-ax1.set_ylabel('Relative Shift in Max. Consumption', fontsize=20)
+ax1.set_ylabel('Shift in Peak Simultaneity', fontsize=20)
 ax1.set_title('Low Market Signal & High Network Signal', fontsize=18)
 
+# Legend with high quantiles first (top), low quantiles last (bottom)
+# Create custom legend handles to match plot appearance
+from matplotlib.lines import Line2D
+legend_elements1 = [
+    Line2D([0], [0], color='black', linewidth=1, label='Maximum'),
+    Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.8, label='5% of DSOs exceed'),
+    Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.6, label='10% of DSOs exceed'),
+    Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.4, label='25% of DSOs exceed'),
+    Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.2, label='Median')
+]
+ax1.legend(handles=legend_elements1, fontsize=14, ncol=1, loc="upper right",
+           bbox_to_anchor=(0.95, 0.98))
+
 # ── Right subfigure (blue) ────────────────────────────────────────────────────
-for r in diff_blue.r.values:
-    for yr in diff_blue.y.values:
-        ax2.plot(
-            diff_blue.qh.values,
-            diff_blue.sel(r=r, y=yr).values,
-            alpha=0.05,
-            color='#004c93'
-        )
-ax2.axhline(0, color='darkgray', linewidth=2, linestyle='--', zorder=0)
 ax2.grid(True, linestyle='--', color='lightgray', zorder=0)
+
+# Single fill_between from 0 to max with alpha=0.1
+ax2.fill_between(qh_vals_blue,
+                 0,
+                 max_blue.values,
+                 color='#004c93', alpha=0.1, zorder=1)
+
+# Draw quantile lines with increasing darkness (all 1px)
+ax2.plot(qh_vals_blue, q_blue.sel(quantile=0.50).values,
+         color=blue_colors[0], linewidth=1, alpha=blue_alphas[0], 
+         zorder=6, label='25% of DSOs exceeding')
+
+ax2.plot(qh_vals_blue, q_blue.sel(quantile=0.75).values,
+         color=blue_colors[1], linewidth=1, alpha=blue_alphas[1], 
+         zorder=7, label='10% of DSOs exceeding')
+
+ax2.plot(qh_vals_blue, q_blue.sel(quantile=0.90).values,
+         color=blue_colors[2], linewidth=1, alpha=blue_alphas[2], 
+         zorder=8, label='5% of DSOs exceeding')
+
+ax2.plot(qh_vals_blue, q_blue.sel(quantile=0.95).values,
+         color=blue_colors[3], linewidth=1, alpha=blue_alphas[3], 
+         zorder=9, label='Maximum')
+
+# Draw max line (black solid, 1px)
+ax2.plot(qh_vals_blue, max_blue.values,
+         color='black', linewidth=1, alpha=1.0, linestyle='-',
+         zorder=10)
+
 ax2.set_xlim(0, 24)
 ax2.set_xticks([0, 3, 6, 9, 12, 15, 18, 21, 24])
 ax2.set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
-yticks = [round(v * 0.1, 1) for v in range(-10, 11)]
-ax2.set_yticks(yticks)
-ax2.set_yticklabels([str(v) if i % 2 == 0 else '' for i, v in enumerate(yticks)], fontsize=20)
-ax2.set_ylim(-1, 1)
+ax2.set_ylim(0, 0.50)
+yticks2 = [round(v * 0.025, 3) for v in range(0, 21)]
+yticklabels2 = [f"{int(round(v*100))}%" if i % 2 == 0 else "" for i, v in enumerate(yticks2)]
+ax2.set_yticks(yticks2)
+ax2.set_yticklabels(yticklabels2, fontsize=16)
 ax2.set_xlabel('Hour of the Day', fontsize=20)
-ax2.set_ylabel('Relative Shift in Max. Consumption', fontsize=20)
+ax2.set_ylabel('Shift in Peak Simultaneity', fontsize=20)
 ax2.set_title('Low Market Signal & Low Network Signal', fontsize=18)
+
+# Legend with high quantiles first (top), low quantiles last (bottom)
+# Create custom legend handles to match plot appearance
+legend_elements2 = [
+    Line2D([0], [0], color='black', linewidth=1, label='Maximum'),
+    Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.8, label='5% of DSOs exceed'),
+    Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.6, label='10% of DSOs exceed'),
+    Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.4, label='25% of DSOs exceed'),
+    Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.2, label='Median')
+]
+ax2.legend(handles=legend_elements2, fontsize=14, ncol=1, loc="upper right",
+           bbox_to_anchor=(0.90, 0.98))
 
 plt.tight_layout()
 plt.show()
-
-fig_parallel.savefig(r"C:\Users\Hendrik.Kramer\Documents\Repos\ToU_network_charges\daten_results\simultenous_power_ht_nt_2026.svg")
+fig_critical_simultanety.savefig(r"C:\Users\Hendrik.Kramer\Documents\Repos\ToU_network_charges\daten_results\fig_critical_simultanety.svg")
 
 
 # =============================================================================
@@ -788,11 +923,11 @@ if (False):
     
     
     # regular
-    spot_only_smart = r"2025-11-21_00-39_spot_smart_only_EV_r100_v50_poly" + r"\\"                 
+    spot_only_smart = r"2026-09-17_07-17_spot_smart_only_EV" + r"\\"                 
     # sensitivity regulatory
-    spot_only_smart_sensi = r"2025-11-25_04-25_spot_smart_only_EV_r100_v50_sensi_regulatory" + r"\\"                 
+    spot_only_smart_sensi = r"2026-09-20_05-41_spot_smart_only_EV_sensi_regulatory" + r"\\"                 
     # sensitivity double
-    spot_only_smart_sensi2 = r"2025-11-25_11-33_spot_smart_only_EV_r100_v50_sensi_double" + r"\\"                 
+    spot_only_smart_sensi2 = r"2026-09-20_21-59_spot_smart_only_EV_sensi_double" + r"\\"                 
     
     # cost loading
     dso_x_ev = xr.open_dataarray(folder_str + spot_only_smart + "C_ALL.nc").sel(s="red").size
@@ -800,7 +935,7 @@ if (False):
     spot_ToU_sensi_c = xr.open_dataarray(folder_str + spot_only_smart_sensi + "C_ALL.nc").sel(s="red").to_pandas().to_numpy().reshape(dso_x_ev)
     spot_ToU_sensi_c2 = xr.open_dataarray(folder_str + spot_only_smart_sensi2 + "C_ALL.nc").sel(s="red").to_pandas().to_numpy().reshape(dso_x_ev)
     
-    cost_sensi = pd.DataFrame({'base case':spot_ToU_c, 'regulatory limit': spot_ToU_sensi_c,'Half and double':spot_ToU_sensi_c2}) / 100  # ct --> Euro
+    cost_sensi = pd.DataFrame({'Base Case':spot_ToU_c, 'Regulatory Limit': spot_ToU_sensi_c,'Half and Double':spot_ToU_sensi_c2}) # ct --> Euro
     # no linebreak space between "base" and "case"
     
     # power consumption loading
@@ -810,15 +945,15 @@ if (False):
     
     pd_ct = pd.DataFrame()
     
-    pd_ct["Base case"] = spot_ToU 
-    pd_ct["Regulatory limit"] = spot_ToU_sensi
-    pd_ct["Half and double"] = spot_ToU_sensi2
+    pd_ct["Base Case"] = spot_ToU 
+    pd_ct["Regulatory Limit"] = spot_ToU_sensi
+    pd_ct["Half and Double"] = spot_ToU_sensi2
     
     dti = pd.DatetimeIndex(epoch_time + pd.to_timedelta(xr.open_dataarray(folder_str + spot_only_smart + "P_HOME.nc")["t"], unit='s')).tz_localize("UTC").tz_convert("Europe/Berlin")
     pd_ct = pd_ct.set_index(dti)
     pd_ct["hour decimal"] = pd_ct.index.hour + pd_ct.index.minute/60
     
-    pd_day = pd_ct.groupby(["hour decimal"]).mean()
+    pd_day = pd_ct.groupby(["hour decimal"]).max()
 
 
 
@@ -828,46 +963,52 @@ if (False):
 # kW reduction plots
 if (False):
 
-    fig_sensi, axs_sensi = plt.subplots(ncols=2, figsize=(15, 6), gridspec_kw={'width_ratios': [0.6, 0.4]})   
-
-
-    # RECHTER PLOT
-    meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black') #firebrick
-    flierprops = dict(marker='o', markerfacecolor=(0,0,0,0), markersize=6, markeredgecolor=(0,0,0,0))  # set to transparent
-    cost_sensi.plot(ax = axs_sensi[1],  kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True, meanprops=meanpointprops,  flierprops=flierprops, color=dict(boxes='black', whiskers='black', medians='black', caps='black'), boxprops=dict(facecolor="lightgray"))
-    axs_sensi[1].set_ylabel("Cost in €", fontsize=20)
-    axs_sensi[1].set_xticklabels(cost_sensi.columns.str.replace(" ","\n"), fontsize=20)
-    axs_sensi[1].set_ylim(-3, 125)
-
-
-    axs_sensi[1].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
-    axs_sensi[1].tick_params(axis='both', labelsize=20)
-    axs_sensi[1].set_title("(b) Cost for end-consumers", fontsize=20)
-
-
-
-    #  LINKER PLOT
-    axs_sensi[0].plot(pd_day["Base case"], linestyle="-", alpha=1, linewidth=5,  zorder=0, color="lightgray", label="Base case")
-    axs_sensi[0].plot(pd_day["Regulatory limit"], linestyle="-", alpha=1, linewidth=3, color="darkgray", zorder=1, label="Regulatory limit")
-    axs_sensi[0].plot(pd_day["Half and double"], linestyle="-", alpha=1, zorder=2, linewidth=1, color="dimgrey", label= "Half and double")
-
+    fig_sensi, axs_sensi = plt.subplots(ncols=2, figsize=(15, 6), gridspec_kw={'width_ratios': [0.65, 0.35]})   
+    
+    # LINKER PLOT
+    axs_sensi[0].plot(pd_day["Base Case"], linestyle="-", alpha=1, linewidth=5, zorder=0, color="lightgray", label="Base Case")
+    axs_sensi[0].plot(pd_day["Regulatory Limit"], linestyle="-", alpha=1, linewidth=3, color="darkgray", zorder=1, label="Regulatory Limit")
+    axs_sensi[0].plot(pd_day["Half and Double"], linestyle="-", alpha=1, zorder=2, linewidth=1, color="black", label="Half & Double")
+    
     axs_sensi[0].legend(fontsize=16, ncols=1, loc="upper right")
-
-    axs_sensi[0].set_title("(a) Mean charge power during all seasons", fontsize=20)
-
-    axs_sensi[0].set_ylim(-1, 1)
-    axs_sensi[0].set_xlabel("Time in hours", fontsize=20)
+    axs_sensi[0].set_title("(a) Maximum Charging Power", fontsize=20)
+    axs_sensi[0].set_ylim(0, 10)
+    axs_sensi[0].set_ylim(0, 10)
+    axs_sensi[0].set_yticks(np.arange(0, 11, 1))
+    axs_sensi[0].set_yticklabels([str(v) for v in np.arange(0, 11, 1)], fontsize=20)
+    axs_sensi[0].set_xlabel("Hour of the Day", fontsize=20)
     axs_sensi[0].set_ylabel("Power in kW", fontsize=20)
-    axs_sensi[0].set_ylim(-0.05, 0.63)
     axs_sensi[0].tick_params(axis='both', labelsize=20)
     axs_sensi[0].set_xlim(0, 24)
     axs_sensi[0].set_xticks(np.array([0, 3, 6, 9, 12, 15, 18, 21, 24]))
     axs_sensi[0].set_xticklabels([0, 3, 6, 9, 12, 15, 18, 21, 24], fontsize=20)
     axs_sensi[0].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
+    
+    # RECHTER PLOT
+    meanpointprops = dict(marker='x', markeredgecolor='black', markerfacecolor='black')
+flierprops = dict(marker='o', markerfacecolor=(0,0,0,0), markersize=6, markeredgecolor=(0,0,0,0))
+cost_sensi.plot(ax=axs_sensi[1], kind="box", widths=0.7, patch_artist=True, notch=True, showmeans=True,
+                meanprops=meanpointprops, flierprops=flierprops,
+                color=dict(boxes='black', whiskers='black', medians='black', caps='black'),
+                boxprops=dict(facecolor="lightgray"))
 
+axs_sensi[1].set_ylabel("Cost in €", fontsize=20)
+    axs_sensi[1].set_xticklabels(
+        cost_sensi.columns
+        .str.replace("Base Case", "Base\nCase", regex=False)
+        .str.replace("Regulatory Limit", "Regulatory\nLimit", regex=False)
+        .str.replace("Half and Double", "Half &\nDouble", regex=False),
+        fontsize=20)
+    axs_sensi[1].set_ylim(0, 500)
+    axs_sensi[1].set_yticks(np.arange(0, 550, 50))
+    axs_sensi[1].set_yticklabels([str(v) for v in np.arange(0, 550, 50)], fontsize=20)
+    axs_sensi[1].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
+    axs_sensi[1].tick_params(axis='both', labelsize=20)
+    axs_sensi[1].set_title("(b) Cost for Retail Consumers", fontsize=20)
+    
     plt.tight_layout()
     plt.show()
-
+        
     fig_sensi.savefig(r"C:\Users\Hendrik.Kramer\Documents\Repos\ToU_network_charges\daten_results\sensitivity_test.svg")
 
 
