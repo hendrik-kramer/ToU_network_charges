@@ -831,10 +831,10 @@ ax1.set_ylim(0, 0.25)
 yticks1 = [round(v * 0.025, 3) for v in range(0, 11)]
 yticklabels1 = [f"{int(round(v*100))}%" if i % 2 == 0 else "" for i, v in enumerate(yticks1)]
 ax1.set_yticks(yticks1)
-ax1.set_yticklabels(yticklabels1, fontsize=16)
+ax1.set_yticklabels(yticklabels1, fontsize=20)
 ax1.set_xlabel('Hour of the Day', fontsize=20)
 ax1.set_ylabel('Shift in Peak Simultaneity', fontsize=20)
-ax1.set_title('Low Market Signal & High Network Signal', fontsize=18)
+ax1.set_title('Low Market Signal & High Network Signal', fontsize=20)
 
 # Legend with high quantiles first (top), low quantiles last (bottom)
 # Create custom legend handles to match plot appearance
@@ -846,7 +846,7 @@ legend_elements1 = [
     Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.4, label='25% of DSOs exceed'),
     Line2D([0], [0], color='#8b3003', linewidth=1, alpha=0.2, label='Median')
 ]
-ax1.legend(handles=legend_elements1, fontsize=14, ncol=1, loc="upper right",
+ax1.legend(handles=legend_elements1, fontsize=18, ncol=1, loc="upper right",
            bbox_to_anchor=(0.95, 0.98))
 
 # ── Right subfigure (blue) ────────────────────────────────────────────────────
@@ -887,10 +887,10 @@ ax2.set_ylim(0, 0.50)
 yticks2 = [round(v * 0.025, 3) for v in range(0, 21)]
 yticklabels2 = [f"{int(round(v*100))}%" if i % 2 == 0 else "" for i, v in enumerate(yticks2)]
 ax2.set_yticks(yticks2)
-ax2.set_yticklabels(yticklabels2, fontsize=16)
+ax2.set_yticklabels(yticklabels2, fontsize=20)
 ax2.set_xlabel('Hour of the Day', fontsize=20)
 ax2.set_ylabel('Shift in Peak Simultaneity', fontsize=20)
-ax2.set_title('Low Market Signal & Low Network Signal', fontsize=18)
+ax2.set_title('Low Market Signal & Low Network Signal', fontsize=20)
 
 # Legend with high quantiles first (top), low quantiles last (bottom)
 # Create custom legend handles to match plot appearance
@@ -901,8 +901,8 @@ legend_elements2 = [
     Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.4, label='25% of DSOs exceed'),
     Line2D([0], [0], color='#004c93', linewidth=1, alpha=0.2, label='Median')
 ]
-ax2.legend(handles=legend_elements2, fontsize=14, ncol=1, loc="upper right",
-           bbox_to_anchor=(0.90, 0.98))
+ax2.legend(handles=legend_elements2, fontsize=18, ncol=1, loc="upper right",
+           bbox_to_anchor=(0.92, 0.98))
 
 plt.tight_layout()
 plt.show()
@@ -971,7 +971,7 @@ if (False):
     axs_sensi[0].plot(pd_day["Half and Double"], linestyle="-", alpha=1, zorder=2, linewidth=1, color="black", label="Half & Double")
     
     axs_sensi[0].legend(fontsize=16, ncols=1, loc="upper right")
-    axs_sensi[0].set_title("(a) Maximum Charging Power", fontsize=20)
+    axs_sensi[0].set_title("Maximum Charging Power", fontsize=20)
     axs_sensi[0].set_ylim(0, 10)
     axs_sensi[0].set_ylim(0, 10)
     axs_sensi[0].set_yticks(np.arange(0, 11, 1))
@@ -1004,7 +1004,7 @@ axs_sensi[1].set_ylabel("Cost in €", fontsize=20)
     axs_sensi[1].set_yticklabels([str(v) for v in np.arange(0, 550, 50)], fontsize=20)
     axs_sensi[1].grid(color='lightgray', linestyle='--', linewidth=1, axis="both")
     axs_sensi[1].tick_params(axis='both', labelsize=20)
-    axs_sensi[1].set_title("(b) Cost for Retail Consumers", fontsize=20)
+    axs_sensi[1].set_title("Cost for Retail Consumers", fontsize=20)
     
     plt.tight_layout()
     plt.show()
